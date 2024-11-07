@@ -4,13 +4,11 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ArduinoJson.h>
-
-// Define the function pointer type for motor control
-typedef void (*MotorControlFunction)(float x, float y, float z);
+#include "RobotObject.h" // Include the RobotObject header
 
 class MyWiFiServer {
 public:
-    MyWiFiServer(const char* ssid, const char* password, MotorControlFunction moveFunction);
+    MyWiFiServer(const char* ssid, const char* password, RobotObject* robot);
     void begin();
     void loop();
 
@@ -26,7 +24,8 @@ private:
 
     const int HEADERSIZE = 10;
     const int KeepAliveInterval = 30;
-    MotorControlFunction moveFunction; // Store the function pointer
+
+    RobotObject* robot; // Pointer to the RobotObject
 
     void handleClient(int index);
     String readMessage(WiFiClient& client);
@@ -36,4 +35,4 @@ private:
     int getCurrent(char dimension);
 };
 
-#endif // MYWIFISERVER_H
+#endif

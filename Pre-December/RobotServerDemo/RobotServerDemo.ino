@@ -1,23 +1,31 @@
 #include "MyWiFiServer.h"
+#include "RobotObject.h"
 #include "utilities.h"
 
 // Example motor control function
-void moveMotors(float x, float y, float z) {
-    // Your motor control logic goes here
-    Serial.print("In ino script: Moving motors to X: ");
-    Serial.print(x);
-    Serial.print(" Y: ");
-    Serial.print(y);
-    Serial.print(" Z: ");
-    Serial.println(z);
+void myMotorControlFunction(float x, float y, float z) {
+    Serial.print("Moving to position: ");
+    Serial.print("X="); Serial.print(x);
+    Serial.print(", Y="); Serial.print(y);
+    Serial.print(", Z="); Serial.println(z);
+    // Add motor control logic here
 }
 
-MyWiFiServer myServer(ssid, password, *moveMotors); // Create an instance of MyWiFiServer
+// Custom pipet control function
+void myPipetControlFunction(float pipetLevel) {
+    Serial.print("Setting pipet level to: ");
+    Serial.println(pipetLevel);
+    // Add pipet control logic here
+}
+
+RobotObject robot(myMotorControlFunction, myPipetControlFunction);
+MyWiFiServer server(ssid, password, &robot);
 
 void setup() {
-    myServer.begin(); // Start the server
+    Serial.begin(115200);
+    server.begin();
 }
 
 void loop() {
-    myServer.loop(); // Handle server logic
+    server.loop();
 }
