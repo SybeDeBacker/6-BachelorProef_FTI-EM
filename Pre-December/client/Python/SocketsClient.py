@@ -19,7 +19,7 @@ class Point:
         pass
 
 class RobotControlAPI:
-    def __init__(self, server_ip="10.0.1.221", server_port=65432, loopback=True):
+    def __init__(self, server_ip="127.0.0.1", server_port=65432, loopback=True):
         self.server_ip = server_ip
         self.server_port = server_port
         self.loopback = loopback

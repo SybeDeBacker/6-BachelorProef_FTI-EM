@@ -1,25 +1,25 @@
 #ifndef ROBOTOBJECT_H
 #define ROBOTOBJECT_H
 
-typedef void (*MotorControlFunction)(float x, float y, float z);
-typedef void (*PipetControlFunction)(float pipetLevel);
+typedef void (*CustomMotorControlFunction)(float x, float y, float z);
+typedef void (*CustomPipetControlFunction)(float pipetLevel);
 
 class RobotObject {
 public:
     // Constructor to set custom functions
-    RobotObject(MotorControlFunction motorFunc = nullptr, PipetControlFunction pipetFunc = nullptr);
+    RobotObject(CustomMotorControlFunction motorFunc = nullptr, CustomPipetControlFunction pipetFunc = nullptr);
 
     // Setters to allow updating functions after creation
-    void setMotorControlFunction(MotorControlFunction motorFunc);
-    void setPipetControlFunction(PipetControlFunction pipetFunc);
+    void setMotorControlFunction(CustomMotorControlFunction motorFunc);
+    void setPipetControlFunction(CustomPipetControlFunction pipetFunc);
 
     // Methods to invoke the control functions
-    void customMotorControl(float x, float y, float z);
-    void customPipetControl(float pipetLevel);
+    void MoveMotor(float x, float y, float z);
+    void MovePipet(float pipetLevel);
 
 private:
-    MotorControlFunction motorControlFunc;
-    PipetControlFunction pipetControlFunc;
+    CustomMotorControlFunction motorControlFunc;
+    CustomPipetControlFunction pipetControlFunc;
 };
 
 #endif

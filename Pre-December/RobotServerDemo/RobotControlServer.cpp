@@ -1,25 +1,17 @@
-#include "MyWiFiServer.h"
+#include "RobotControlServer.h"
 
-MyWiFiServer::MyWiFiServer(const char* ssid, const char* password, RobotObject* robot)
-  : ssid(ssid), password(password), server(65432), robot(robot) {}
+RobotControlServer::RobotControlServer(RobotObject* robot)
+  : server(65432), robot(robot) {}
 
-void MyWiFiServer::begin() {
+void RobotControlServer::begin() {
   Serial.begin(115200);
-  WiFi.begin(ssid, password);
-
-  // Wait for WiFi connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
-  Serial.println("\nConnected to WiFi!");
 
   server.begin(); // Start the server
   Serial.println("Server started. Waiting for clients...");
   Serial.println("Is er? | Connected? | Available?");
 }
 
-void MyWiFiServer::loop() {
+void RobotControlServer::loop() {
   // Check for incoming clients and add them to the client array
   WiFiClient newClient = server.available();
   if (newClient) {
@@ -60,7 +52,7 @@ void MyWiFiServer::loop() {
   }
 }
 
-void MyWiFiServer::handleClient(int i) {
+void RobotControlServer::handleClient(int i) {
   if (clients[i]) {
     if (clients[i].connected()) {
       // Process client messages if available
@@ -92,7 +84,7 @@ void MyWiFiServer::handleClient(int i) {
 }
 
 // Function to read a message from the client
-String MyWiFiServer::readMessage(WiFiClient& client) {
+String RobotControlServer::readMessage(WiFiClient& client) {
   String message;
   while (client.available()) {
     char c = client.read(); // Read characters one by one
@@ -103,14 +95,14 @@ String MyWiFiServer::readMessage(WiFiClient& client) {
 }
 
 // Function to send a response to the client
-void MyWiFiServer::sendResponse(WiFiClient& client, String message) {
+void RobotControlServer::sendResponse(WiFiClient& client, String message) {
   int messageLength = message.length();
   String header = String(messageLength) + String("                   ").substring(0 + String(messageLength).length(), HEADERSIZE); // Create header
   client.print(header + message); // Send header and message
 }
 
 // Function to handle incoming commands and return a response
-String MyWiFiServer::handleCommand(String command, int clientIndex) {
+String RobotControlServer::handleCommand(String command, int clientIndex) {
     StaticJsonDocument<200> doc; // Adjust size as needed
     DeserializationError error = deserializeJson(doc, command);
 
@@ -159,7 +151,7 @@ String MyWiFiServer::handleCommand(String command, int clientIndex) {
             return "Error: Position out of safe bounds";
         }
 
-        robot->customMotorControl(finalX, finalY, finalZ);  // Call the motor control function on RobotObject
+        robot-> MoveMotor(finalX, finalY, finalZ);  // Call the motor control function on RobotObject
 
         return String("Moved to position X=") + finalX + " Y=" + finalY + " Z=" + finalZ;
 
@@ -169,7 +161,7 @@ String MyWiFiServer::handleCommand(String command, int clientIndex) {
           return String("Error, incorrect command structure: \n"+command);
         }
         Serial.println(pipetLevel);
-        robot->customPipetControl(pipetLevel);  // Call the pipet control function on RobotObject
+        robot-> MovePipet(pipetLevel);  // Call the pipet control function on RobotObject
         return String("Pipet level set to ") + pipetLevel;
 
     } else if (strcmp(type, "ping") == 0) {
@@ -193,7 +185,7 @@ String MyWiFiServer::handleCommand(String command, int clientIndex) {
 }
 
 // Function to check if a position is within safe limits
-bool MyWiFiServer::isPositionSafe(float x, float y, float z) {
+bool RobotControlServer::isPositionSafe(float x, float y, float z) {
   // Example: Define your safety limits (modify as needed)
   const float MIN_X = -100.0;
   const float MAX_X = 100.0;
@@ -206,7 +198,7 @@ bool MyWiFiServer::isPositionSafe(float x, float y, float z) {
 }
 
 // Example implementation of getCurrent functions
-int MyWiFiServer::getCurrent(char dimension) {
+int RobotControlServer::getCurrent(char dimension) {
   // Replace with actual logic to get the current position for each dimension
   switch (dimension) {
     case 'x':
