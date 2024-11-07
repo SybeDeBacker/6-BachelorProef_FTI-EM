@@ -98,6 +98,12 @@ def handle_command(command):
         print("pong")
         return "pong"
     
+    elif command_dict["type"] == "pipet_control":
+        PipetLevel = command_dict["data"]["pipet_level"]
+        if not "pipet_level" in command_dict["data"].keys():
+            return f"Error: incorrect command structure: {command}"
+        return f"Set pipet to level: {PipetLevel} ml"
+
     elif command_dict["type"] == "request":
         try:
             subject = command_dict.get("subject")

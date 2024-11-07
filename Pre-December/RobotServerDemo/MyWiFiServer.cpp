@@ -165,11 +165,17 @@ String MyWiFiServer::handleCommand(String command, int clientIndex) {
 
     } else if (strcmp(type, "pipet_control") == 0) {
         float pipetLevel = doc["data"]["pipet_level"];
+        if (String(doc["data"]).indexOf("pipet_level") < 0){
+          return String("Error, incorrect command structure: \n"+command);
+        }
+        Serial.println(pipetLevel);
         robot->customPipetControl(pipetLevel);  // Call the pipet control function on RobotObject
         return String("Pipet level set to ") + pipetLevel;
+
     } else if (strcmp(type, "ping") == 0) {
         lastKeepAlive[clientIndex] = millis();
         return "pong";
+
     } else if (strcmp(type, "request") == 0) {
         const char* subject = doc["subject"];
         if (!subject) {

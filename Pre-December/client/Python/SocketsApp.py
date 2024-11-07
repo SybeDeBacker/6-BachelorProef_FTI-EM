@@ -40,11 +40,16 @@ class TCPClientApp:
         self.ping_interval = 5  # Send a ping every 5 seconds
         
         # Attempt to connect
-        self.connect_to_server()
+        Thread(target=self.start_connection).start()
         
+        self.update_status("Connecting...","black")
         # Start GUI update loop
         self.update_gui()
     
+    def start_connection(self):
+        #Attempts to connect to the server after the GUI is initialized.
+        self.connect_to_server()
+
     def setup_gui(self):
         # Coordinate system selection frame
         coord_frame = ttk.LabelFrame(self.master, text="Coordinate System", padding=10)
@@ -192,7 +197,7 @@ class TCPClientApp:
             command = {
                 "type": "pipet_control",
                 "data": {
-                    "level": pipet_level
+                    "pipet_level": pipet_level
                 }
             }
 
@@ -262,9 +267,23 @@ class TCPClientApp:
             return False
     
     def reconnect(self):
+        # Update status to indicate reconnection is in progress
+        self.update_status("Reconnecting...", "black")
+        
+        # Start reconnection in a separate thread to keep the GUI responsive
+        Thread(target=self.perform_reconnect).start()
+
+    def perform_reconnect(self):
+        # Set connected to False and attempt to reconnect
         self.connected = False
-        self.connect_to_server()
-    
+        success = self.connect_to_server()  # Attempt to reconnect
+
+        # Update the status based on whether the reconnection was successful
+        if success:
+            self.update_status("Reconnected successfully", "green")
+        else:
+            self.update_status("Reconnection failed", "red")
+
     def update_status(self, message, color):
         self.message_queue.put(("status", message, color))
     
