@@ -18,6 +18,9 @@ void myPipetControlFunction(float pipetLevel) {
     // Add pipet control logic here
 }
 
+const char* ssid = utilities.ssid();
+cosnt char* password = utilities.password();
+
 RobotObject robot(myMotorControlFunction, myPipetControlFunction);
 MyWiFiServer server(ssid, password, &robot);
 
