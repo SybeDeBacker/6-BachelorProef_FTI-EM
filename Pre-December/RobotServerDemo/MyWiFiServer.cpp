@@ -1,7 +1,7 @@
 #include "MyWiFiServer.h"
 
-MyWiFiServer::MyWiFiServer(const char* ssid, const char* password, MotorControlFunction moveFunction)
-  : ssid(ssid), password(password), server(65432), moveFunction(moveFunction) {}
+MyWiFiServer::MyWiFiServer(const char* ssid, const char* password, RobotObject* robot)
+  : ssid(ssid), password(password), server(65432), robot(robot) {}
 
 void MyWiFiServer::begin() {
   Serial.begin(115200);
@@ -111,91 +111,79 @@ void MyWiFiServer::sendResponse(WiFiClient& client, String message) {
 
 // Function to handle incoming commands and return a response
 String MyWiFiServer::handleCommand(String command, int clientIndex) {
-  StaticJsonDocument<200> doc; // Adjust size as needed
-  DeserializationError error = deserializeJson(doc, command);
+    StaticJsonDocument<200> doc; // Adjust size as needed
+    DeserializationError error = deserializeJson(doc, command);
 
-  if (error) {
-    return "Error: Invalid command format"; // Error handling for JSON parsing
-  }
-
-  const char* type = doc["type"];
-  
-  if (strcmp(type, "move") == 0) {
-    const char* coordSystem = doc["coordinate_system"];
-    
-    if (!coordSystem) {
-      return "Error: No coordinate system specified";
+    if (error) {
+        return "Error: Invalid command format"; // Error handling for JSON parsing
     }
 
-    // Variables to store final cartesian coordinates
-    float finalX, finalY, finalZ;
-    
-    if (strcmp(coordSystem, "cartesian_abs") == 0) {
-      // Direct assignment for absolute cartesian
-      finalX = doc["data"]["x"];
-      finalY = doc["data"]["y"];
-      finalZ = doc["data"]["z"];
+    const char* type = doc["type"];
+
+    if (strcmp(type, "move") == 0) {
+        const char* coordSystem = doc["coordinate_system"];
+
+        if (!coordSystem) {
+            return "Error: No coordinate system specified";
+        }
+
+        // Variables to store final cartesian coordinates
+        float finalX, finalY, finalZ;
+
+        if (strcmp(coordSystem, "cartesian_abs") == 0) {
+            finalX = doc["data"]["x"];
+            finalY = doc["data"]["y"];
+            finalZ = doc["data"]["z"];
+        } else if (strcmp(coordSystem, "cartesian_rel") == 0) {
+            float deltaX = doc["data"]["x"];
+            float deltaY = doc["data"]["y"];
+            float deltaZ = doc["data"]["z"];
             
-    } else if (strcmp(coordSystem, "cartesian_rel") == 0) {
-      // Add to current position for relative cartesian
-      float deltaX = doc["data"]["x"];
-      float deltaY = doc["data"]["y"];
-      float deltaZ = doc["data"]["z"];
-      
-      finalX = getCurrent('x') + deltaX;  // You'll need to implement getCurrentX()
-      finalY = getCurrent('y') + deltaY;  // You'll need to implement getCurrentY()
-      finalZ = getCurrent('z') + deltaZ;  // You'll need to implement getCurrentZ()
+            finalX = getCurrent('x') + deltaX;
+            finalY = getCurrent('y') + deltaY;
+            finalZ = getCurrent('z') + deltaZ;
+        } else if (strcmp(coordSystem, "polar") == 0) {
+            float r = doc["data"]["r"];
+            float theta = doc["data"]["theta"];
+            float z = doc["data"]["z"];
             
-    } else if (strcmp(coordSystem, "polar") == 0) {
-      // Convert polar to cartesian
-      float r = doc["data"]["r"];
-      float theta = doc["data"]["theta"]; // theta should be in degrees
-      float z = doc["data"]["z"];
-      
-      // Convert theta to radians for calculations
-      float thetaRad = theta * PI / 180.0;
-      
-      // Convert polar to cartesian coordinates
-      finalX = r * cos(thetaRad);
-      finalY = r * sin(thetaRad);
-      finalZ = z;
-            
-    } else {
-      return "Error: Invalid coordinate system";
-    }
-    
-    // Check if the calculated position is within safe bounds
-    if (!isPositionSafe(finalX, finalY, finalZ)) {
-      return "Error: Position out of safe bounds";
-    }
-    
-    // Move to the calculated position
-    moveFunction(finalX, finalY, finalZ);  // Call the motor control function
-    
-    // Return the final cartesian coordinates that were used
-    return String("Moved to position X=") + finalX + " Y=" + finalY + " Z=" + finalZ;
-      
-  } 
-  else if (strcmp(type, "ping") == 0) {
-    lastKeepAlive[clientIndex] = millis();
-    return "pong"; // Respond to ping
-  } 
-  else if (strcmp(type, "request") == 0){
-    const char* subject = doc["subject"];
-    if (!subject) {
-      return "Error: No request subject specified";
-    }
-    if (strcmp(subject, "current_pos") == 0) {
-      // Direct assignment for absolute cartesian
-      float X = getCurrent('x');
-      float Y = getCurrent('y');
-      float Z = getCurrent('z');
+            float thetaRad = theta * PI / 180.0;
+            finalX = r * cos(thetaRad);
+            finalY = r * sin(thetaRad);
+            finalZ = z;
+        } else {
+            return "Error: Invalid coordinate system";
+        }
 
-      return String("Current position: X=") + X + " Y=" + Y + " Z=" + Z;
+        if (!isPositionSafe(finalX, finalY, finalZ)) {
+            return "Error: Position out of safe bounds";
+        }
+
+        robot->customMotorControl(finalX, finalY, finalZ);  // Call the motor control function on RobotObject
+
+        return String("Moved to position X=") + finalX + " Y=" + finalY + " Z=" + finalZ;
+
+    } else if (strcmp(type, "pipet_control") == 0) {
+        float pipetLevel = doc["data"]["pipet_level"];
+        robot->customPipetControl(pipetLevel);  // Call the pipet control function on RobotObject
+        return String("Pipet level set to ") + pipetLevel;
+    } else if (strcmp(type, "ping") == 0) {
+        lastKeepAlive[clientIndex] = millis();
+        return "pong";
+    } else if (strcmp(type, "request") == 0) {
+        const char* subject = doc["subject"];
+        if (!subject) {
+            return "Error: No request subject specified";
+        }
+        if (strcmp(subject, "current_pos") == 0) {
+            float X = getCurrent('x');
+            float Y = getCurrent('y');
+            float Z = getCurrent('z');
+            return String("Current position: X=") + X + " Y=" + Y + " Z=" + Z;
+        }
     }
-  }
-  
-  return "Error: Unknown command"; // Default response for unrecognized command
+
+    return "Error: Unknown command";
 }
 
 // Function to check if a position is within safe limits

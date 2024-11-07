@@ -91,8 +91,22 @@ class TCPClientApp:
         self.request_button = ttk.Button(position_frame, text="Request Position", command=self.send_request)
         self.request_button.pack(side='right', anchor='w', pady=10)
         
+        # Pipet control frame
+        pipet_frame = ttk.LabelFrame(self.master, text="Pipet Control", padding=10)
+        pipet_frame.pack(padx=10, pady=5, fill=tk.X)
+
+        # Pipet level entry
+        ttk.Label(pipet_frame, text="Pipet Level:").pack(side=tk.LEFT, padx=5)
+        self.pipet_level_var = tk.StringVar(value="0")
+        pipet_entry = ttk.Entry(pipet_frame, textvariable=self.pipet_level_var, width=10)
+        pipet_entry.pack(side=tk.LEFT, padx=5)
+
+        # Pipet control button
+        self.pipet_button = ttk.Button(pipet_frame, text="Set Pipet", command=self.send_pipet_command)
+        self.pipet_button.pack(side=tk.LEFT, padx=5)
+
         # Message display area
-        self.message_area = scrolledtext.ScrolledText(self.master, wrap=tk.WORD, height=20)
+        self.message_area = scrolledtext.ScrolledText(self.master, wrap=tk.WORD, height=15)
         self.message_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
         # Connection status frame
@@ -164,6 +178,33 @@ class TCPClientApp:
             
         except ValueError:
             self.display_message("Error: Position values must be numbers")
+
+    def send_pipet_command(self):
+        if not self.connected:
+            self.display_message("Error: Not connected to server")
+            return
+
+        try:
+            # Get pipet level from entry
+            pipet_level = float(self.pipet_level_var.get())
+
+            # Create pipet command
+            command = {
+                "type": "pipet_control",
+                "data": {
+                    "level": pipet_level
+                }
+            }
+
+            # Convert to JSON string
+            command_str = json.dumps(command)
+
+            # Send command
+            self.send_message(command_str)
+            self.display_message(f"Sending pipet command: level={pipet_level}")
+
+        except ValueError:
+            self.display_message("Error: Pipet level must be a number")
 
     def send_request(self, subject=None):
         self.display_message("Requesting current position.")
