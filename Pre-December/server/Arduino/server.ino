@@ -9,6 +9,9 @@ const int MAX_CLIENTS = 5;                // Max number of clients to handle
 WiFiClient clients[MAX_CLIENTS];          // Array to hold client connections
 unsigned long lastKeepAlive[MAX_CLIENTS];  // Array to track keep-alive timestamps for each client
 
+ssid = utilities.ssid();
+password = utilities.password();
+
 const int HEADERSIZE = 10;                 // Header size for message length
 const int KeepAliveInterval = 30;          // Keep alive interval in seconds
 

@@ -7,6 +7,9 @@ const int serverPort = 65432;
 const int HEADERSIZE = 10;
 int i=0;
 
+ssid = utilities.ssid();
+password = utilities.password();
+
 int lastCommand = 0;
 
 int lastKeepAlive = 0;
