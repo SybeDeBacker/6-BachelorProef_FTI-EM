@@ -16,7 +16,7 @@ class TCPClientApp:
         
         # Connection settings
         self.loopback = True
-        self.server_ip = "10.0.1.221"
+        self.server_ip = "127.0.0.1"
         self.server_port = 65432
         self.connected = False
         self.message_queue = queue.Queue()
@@ -228,7 +228,7 @@ class TCPClientApp:
 
             if not self.is_device_online():
                 if self.loopback:
-                    self.server_ip = "10.0.1.221"
+                    self.server_ip = "127.0.0.1"
                 else:
                     raise Exception(f"Device at {self.server_ip} is offline.")
 

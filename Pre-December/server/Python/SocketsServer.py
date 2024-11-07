@@ -8,7 +8,8 @@ import threading
 
 HEADERSIZE = 10
 # Server IP and Port Configuration
-SERVER_IP = '10.0.1.221'
+#SERVER_IP = '10.0.1.221'
+SERVER_IP = '127.0.0.1'
 SERVER_PORT = 65432
 
 KeepAliveInterval = 30
