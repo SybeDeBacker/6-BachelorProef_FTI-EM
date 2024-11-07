@@ -280,9 +280,9 @@ class TCPClientApp:
 
         # Update the status based on whether the reconnection was successful
         if success:
-            self.update_status("Reconnected successfully", "green")
+            self.update_status(f"Connected to {self.server_ip}", "green")
         else:
-            self.update_status("Reconnection failed", "red")
+            self.update_status("Disconnected", "red")
 
     def update_status(self, message, color):
         self.message_queue.put(("status", message, color))
@@ -345,6 +345,8 @@ class TCPClientApp:
                 if self.connected:  # Only show error if we haven't intentionally disconnected
                     if "[WinError 10060]" in str(e) or "[WinError 10054]" in str(e) or "[WinError 10057]" in str(e):
                         self.display_message("The server is no longer available.")
+                    elif "Max client" in str(e):
+                        self.display_message("Connection refused: Server is full.")
                     else:
                         self.display_message(f"Connection lost: {e}")
                     self.connected = False

@@ -21,7 +21,7 @@ void RobotControlServer::loop() {
         clients[i] = newClient;
         lastKeepAlive[i] = millis();
         Serial.println("New client connected");
-        sendResponse(clients[i], "Connection established: " + String(i));
+        sendResponse(clients[i], "Connection established: " + String(i+1));
         added = true;
         break;
       }
@@ -29,6 +29,7 @@ void RobotControlServer::loop() {
     if (!added) {
       Serial.println("Max clients reached. Connection refused.");
       newClient.println("Max clients reached. Connection refused.");
+      delay(500);
       newClient.stop(); // Refuse connection if the array is full
     }
   }
