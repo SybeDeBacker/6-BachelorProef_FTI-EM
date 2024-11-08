@@ -2,3 +2,5 @@ c_cpp_properties.json
 launch.json
 settings.json
 utilities.h
+BlocksAppTest.py
+images.png

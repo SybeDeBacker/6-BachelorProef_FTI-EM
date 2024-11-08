@@ -16,10 +16,19 @@ public:
     // Methods to invoke the control functions
     void MoveMotor(float x, float y, float z);
     void MovePipet(float pipetLevel);
+    bool isPositionSafe(float x, float y, float z);
+    void setBounds(float x_min, float x_max, float y_min, float y_max, float z_min, float z_max);
 
 private:
     CustomMotorControlFunction motorControlFunc;
     CustomPipetControlFunction pipetControlFunc;
+
+    float MIN_X = -100.0;
+    float MAX_X = 100.0;
+    float MIN_Y = -100.0;
+    float MAX_Y = 100.0;
+    float MIN_Z = 0.0;
+    float MAX_Z = 100.0;
 };
 
 #endif

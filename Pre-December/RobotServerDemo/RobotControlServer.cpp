@@ -49,6 +49,11 @@ void RobotControlServer::loop() {
       }
     }
 
+    if (!clients[i].connected()) {
+      clients[i].stop();
+      clients[i] = WiFiClient(); // Reset the client slot
+    }
+    
     handleClient(i);
   }
 }
@@ -148,7 +153,7 @@ String RobotControlServer::handleCommand(String command, int clientIndex) {
             return "Error: Invalid coordinate system";
         }
 
-        if (!isPositionSafe(finalX, finalY, finalZ)) {
+        if (!robot->isPositionSafe(finalX, finalY, finalZ)) {
             return "Error: Position out of safe bounds";
         }
 
@@ -183,19 +188,6 @@ String RobotControlServer::handleCommand(String command, int clientIndex) {
     }
 
     return "Error: Unknown command";
-}
-
-// Function to check if a position is within safe limits
-bool RobotControlServer::isPositionSafe(float x, float y, float z) {
-  // Example: Define your safety limits (modify as needed)
-  const float MIN_X = -100.0;
-  const float MAX_X = 100.0;
-  const float MIN_Y = -100.0;
-  const float MAX_Y = 100.0;
-  const float MIN_Z = 0.0;
-  const float MAX_Z = 100.0;
-
-  return (x >= MIN_X && x <= MAX_X && y >= MIN_Y && y <= MAX_Y && z >= MIN_Z && z <= MAX_Z);
 }
 
 // Example implementation of getCurrent functions
