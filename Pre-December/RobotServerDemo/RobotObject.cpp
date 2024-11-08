@@ -1,10 +1,9 @@
 #include "RobotObject.h"
 
 // Constructor to initialize with optional custom functions
-RobotObject::RobotObject(CustomMotorControlFunction motorFunc, CustomPipetControlFunction pipetFunc, 
-                          float min_x, float max_x, float min_y, float max_y, float min_z, float max_z)
-  : motorControlFunc(motorFunc), pipetControlFunc(pipetFunc), 
-    MIN_X(min_x), MAX_X(max_x), MIN_Y(min_y), MAX_Y(max_y), MIN_Z(min_z), MAX_Z(max_z) {}
+RobotObject::RobotObject(CustomMotorControlFunction motorFunc, CustomPipetControlFunction pipetFunc)
+
+  : motorControlFunc(motorFunc), pipetControlFunc(pipetFunc){}
 
 // Set or update the motor control function
 void RobotObject::setMotorControlFunction(CustomMotorControlFunction motorFunc) {
