@@ -1,8 +1,10 @@
 #include "RobotObject.h"
 
 // Constructor to initialize with optional custom functions
-RobotObject::RobotObject(CustomMotorControlFunction motorFunc, CustomPipetControlFunction pipetFunc)
-    : motorControlFunc(motorFunc), pipetControlFunc(pipetFunc), MIN_X(MIN_X), MAX_X(MAX_X), MIN_Y(MIN_Y), MAX_Y(MAX_Y), MIN_Z(MIN_Z), MAX_Z(MAX_Z) {}
+RobotObject::RobotObject(CustomMotorControlFunction motorFunc, CustomPipetControlFunction pipetFunc, 
+                          float min_x, float max_x, float min_y, float max_y, float min_z, float max_z)
+  : motorControlFunc(motorFunc), pipetControlFunc(pipetFunc), 
+    MIN_X(min_x), MAX_X(max_x), MIN_Y(min_y), MAX_Y(max_y), MIN_Z(min_z), MAX_Z(max_z) {}
 
 // Set or update the motor control function
 void RobotObject::setMotorControlFunction(CustomMotorControlFunction motorFunc) {
@@ -30,7 +32,7 @@ void RobotObject::MovePipet(float pipetLevel) {
 
 // Function to check if a position is within safe limits
 bool RobotObject::isPositionSafe(float x, float y, float z) {
-    return (x >= MIN_X && x <= MAX_X && y >= MIN_Y && y <= MAX_Y && z >= MIN_Z && z <= MAX_Z);
+  return (x >= MIN_X && x <= MAX_X && y >= MIN_Y && y <= MAX_Y && z >= MIN_Z && z <= MAX_Z);
 }
 
 void RobotObject::setBounds(float x_min, float x_max, float y_min, float y_max, float z_min, float z_max) {
