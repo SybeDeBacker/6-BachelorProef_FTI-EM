@@ -241,7 +241,10 @@ class TCPClientApp:
                 self.client_socket.connect((self.server_ip, self.server_port))
             except Exception as e:
                 print(f"{e}")
-                sleep(5)
+                self.connected = False
+                self.update_status(f"Connection failed", "red")
+                return False
+            
             self.connected = True
             self.update_status(f"Connected to {self.server_ip}", "green")
             
@@ -276,13 +279,7 @@ class TCPClientApp:
     def perform_reconnect(self):
         # Set connected to False and attempt to reconnect
         self.connected = False
-        success = self.connect_to_server()  # Attempt to reconnect
-
-        # Update the status based on whether the reconnection was successful
-        if success:
-            self.update_status(f"Connected to {self.server_ip}", "green")
-        else:
-            self.update_status("Disconnected", "red")
+        self.connect_to_server()  # Attempt to reconnect
 
     def update_status(self, message, color):
         self.message_queue.put(("status", message, color))
