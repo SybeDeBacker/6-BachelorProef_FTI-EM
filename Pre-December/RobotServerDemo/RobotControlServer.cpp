@@ -7,7 +7,8 @@ void RobotControlServer::begin() {
   Serial.begin(115200);
 
   server.begin(); // Start the server
-  Serial.println("Server started. Waiting for clients...");
+  Serial.print("\nServer started. Waiting for clients at: ");
+  Serial.println((WiFi.localIP()).toString()+":"+String(server.port()));
   Serial.println("Is er? | Connected? | Available?");
 }
 

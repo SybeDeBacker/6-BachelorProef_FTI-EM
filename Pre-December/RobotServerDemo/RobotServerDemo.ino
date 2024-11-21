@@ -33,11 +33,6 @@ void setup_connection(){
         delay(500);
         Serial.print(".");
     }
-
-    Serial.println();
-    Serial.println("WiFi connected!");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());  // Print the IP address assigned to the ESP8266
 }
 
 // Create robot object as a wrapper for the Control Functions
