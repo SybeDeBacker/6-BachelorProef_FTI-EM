@@ -1,128 +1,70 @@
 from flask import Flask, request, jsonify
 import math
 
-Robot_Control_Server = Flask(__name__)
-
-# Global Variables and Robot Object
+# Global Variables and Classes
 class Point:
-    def __init__(self, x:float, y:float, z:float, coordinate_system: str = "cartesian_absolute") -> None:
+    def __init__(self, x: float, y: float, z: float, coordinate_system: str = "cartesian_absolute") -> None:
         self.x = x
         self.y = y
         self.z = z
         self.coordinate_system = coordinate_system
-        self.coordinates = (x,y,z)
-        self.current_index = 0
 
     def __repr__(self):
         return f"Point(x={self.x}, y={self.y}, z={self.z})"
-    
-    def __iter__(self):
-        self.current_index = 0
-        return self
-    
-    def __next__(self):
-        if self.current_index == 3:
-            raise StopIteration
-        
-        self.current_index += 1
-        return self.coordinates[self.current_index-1]
-    
-    def get_coordinate_system(self):
-        return self.coordinate_system
+
 
 class Coordinate_Range:
-    def __init__(self, x_range: list[float], y_range: list[float], z_range: list[float], coordinate_system: str = "cartesian_absolute") -> None:
+    def __init__(self, x_range, y_range, z_range, coordinate_system="cartesian_absolute"):
         self.x_range = x_range
         self.y_range = y_range
         self.z_range = z_range
-        self.ranges = [x_range, y_range, z_range]
-        self.current_range_index = 0
         self.coordinate_system = coordinate_system
 
-    def contains(self, Point: Point):
-        x_safe = (min(self.x_range) <= Point.x <= max(self.x_range))
-        y_safe = (min(self.y_range) <= Point.y <= max(self.y_range))
-        z_safe = (min(self.z_range) <= Point.z <= max(self.z_range))
-        return x_safe and y_safe and z_safe
+    def contains(self, point: Point):
+        return (
+            self.x_range[0] <= point.x <= self.x_range[1] and
+            self.y_range[0] <= point.y <= self.y_range[1] and
+            self.z_range[0] <= point.z <= self.z_range[1]
+        )
 
-    def __repr__(self):
-        return f"{self.x_range}, {self.y_range}, {self.z_range}"
-    
-    def __iter__(self):
-        self.current_range_index = 0
-        return self
-
-    def __next__(self):
-        if self.current_range_index >= len(self.ranges):
-            raise StopIteration
-        self.current_range_index += 1
-        return self.ranges[self.current_range_index-1]
 
 class RobotObject:
     def __init__(self):
-        self.current_position = Point(10,20,30)  # Initial position
-        self.pipet_level = 0  # Initial pipet level
-        self.safe_bounds = Coordinate_Range([0,100],[0,100],[0,50])
-
-        self.x_homing_switch = True
-        self.y_homing_switch = True
-        self.z_homing_switch = True
-
-        self.home_robot()
+        self.current_position = Point(10, 20, 30)
+        self.pipet_level = 0
+        self.safe_bounds = Coordinate_Range([0, 100], [0, 100], [0, 50])
 
     def MoveMotor(self, x, y, z):
-        # Motor control functions go here
-        self.current_position = Point(x,y,z)
+        self.current_position = Point(x, y, z)
         print(f"Robot moved to position X={x}, Y={y}, Z={z}")
 
     def MovePipet(self, level):
-        # Pipet control functions go here
         self.pipet_level = level
         print(f"Pipet level set to {level} ml")
 
     def get_current_position(self):
-        #implement position logic
         return self.current_position
-    
+
     def is_position_safe(self, x, y, z):
-        return self.safe_bounds.contains(Point(x,y,z))
-    
+        return self.safe_bounds.contains(Point(x, y, z))
+
     def home_robot(self):
-        #x_motor_run toward home
-        #y_motor_run toward home
-        #z_motor_run toward home
-        while not (self.x_homing_switch and self.y_homing_switch and self.z_homing_switch):
-            if self.x_homing_switch:
-                #x_motor_stop
-                pass
-            if self.y_homing_switch:
-                #y_motor_stop
-                pass
-            if self.z_homing_switch:
-                #z_motor_stop
-                pass
-        self.current_position = Point(0,0,0)
+        self.current_position = Point(0, 0, 0)
 
-# Create an instance of RobotObject
-robot = RobotObject()
-
-# Safety limits
-SAFE_LIMITS = {
-    "x": (0, 100),
-    "y": (0, 100),
-    "z": (0, 100)
-}
 
 class RobotServer:
-    Robot_Control_Server = Flask(__name__)
-    def __init__(self, Robot : RobotObject):
-        self.Robot : RobotObject = Robot
-        
-    @Robot_Control_Server.route('/move', methods=['POST'])
+    def __init__(self, robot: RobotObject):
+        self.robot = robot
+        self.app = Flask(__name__)
+
+        # Define routes
+        self.app.add_url_rule('/move', 'move', self.handle_move_command, methods=['POST'])
+        self.app.add_url_rule('/pipet_control', 'pipet_control', self.handle_pipet_control, methods=['POST'])
+        self.app.add_url_rule('/ping', 'ping', self.handle_ping, methods=['GET'])
+        self.app.add_url_rule('/request', 'request', self.handle_request, methods=['GET'])
+        self.app.add_url_rule('/home_robot', 'home_robot', self.home_robot, methods=['GET'])
+
     def handle_move_command(self):
-        """
-        Handles the /move endpoint to move the robot.
-        """
         try:
             command = request.get_json()
             coord_system = command.get("coordinate_system")
@@ -133,34 +75,26 @@ class RobotServer:
 
             if coord_system == "cartesian_abs":
                 x, y, z = float(data["x"]), float(data["y"]), float(data["z"])
-
             elif coord_system == "cartesian_rel":
                 dx, dy, dz = float(data["x"]), float(data["y"]), float(data["z"])
-                current_pos = self.Robot.get_current_position()
+                current_pos = self.robot.get_current_position()
                 x, y, z = current_pos.x + dx, current_pos.y + dy, current_pos.z + dz
-
             elif coord_system == "polar":
                 r, theta, z = float(data["r"]), float(data["theta"]), float(data["z"])
                 theta_rad = math.radians(theta)
                 x, y = r * math.cos(theta_rad), r * math.sin(theta_rad)
-
             else:
                 return jsonify({"status": "Error", "message": "Invalid coordinate system"}), 400
 
-            if not self.Robot.is_position_safe(x, y, z):
+            if not self.robot.is_position_safe(x, y, z):
                 return jsonify({"status": "Error", "message": "Position out of safe bounds"}), 400
 
-            self.Robot.MoveMotor(x, y, z)
+            self.robot.MoveMotor(x, y, z)
             return jsonify({"status": "Success", "message": f"Moved to position X={x} Y={y} Z={z}"})
-
         except Exception as e:
             return jsonify({"status": "Error", "message": f"Error processing move command: {e}"}), 500
 
-    @Robot_Control_Server.route('/pipet_control', methods=['POST'])
     def handle_pipet_control(self):
-        """
-        Handles the /pipet_control endpoint to set the pipet level.
-        """
         try:
             command = request.get_json()
             pipet_level = command["data"].get("pipet_level")
@@ -168,48 +102,33 @@ class RobotServer:
             if pipet_level is None:
                 return jsonify({"status": "Error", "message": "Missing pipet_level in command"}), 400
 
-            self.Robot.MovePipet(pipet_level)
+            self.robot.MovePipet(pipet_level)
             return jsonify({"status": "Success", "message": f"Pipet level set to {pipet_level}"})
-
         except Exception as e:
             return jsonify({"status": "Error", "message": f"Error processing pipet control command: {e}"}), 500
 
-    @Robot_Control_Server.route('/ping', methods=['GET'])
-    def handle_ping():
-        """
-        Handles the /ping endpoint to confirm connectivity.
-        """
-        print("Ping received")
+    def handle_ping(self):
         return jsonify({"status": "Success", "message": "pong"})
 
-    @Robot_Control_Server.route('/', methods=['GET'])
-    def sample():
-        """
-        Handles the /ping endpoint to confirm connectivity.
-        """
-        print("Ping received")
-        return jsonify({"status": "Success", "message": "This is the default path, use /ping instead"})
-
-    @Robot_Control_Server.route('/request', methods=['GET'])
     def handle_request(self):
-        """
-        Handles the /request endpoint to retrieve robot information.
-        """
         try:
-            current_pos = self.Robot.get_current_position()
+            current_pos = self.robot.get_current_position()
             return jsonify({"status": "Success", "message": f"Current position: X={current_pos.x} Y={current_pos.y} Z={current_pos.z}"})
-
         except Exception as e:
             return jsonify({"status": "Error", "message": f"Error processing request: {e}"}), 500
 
-    @Robot_Control_Server.route('/home_robot', methods=['GET'])
     def home_robot(self):
         try:
-            self.Robot.home_robot()
-            return jsonify({"status": "Success", "message": f"Robot homed.\\n Current position: X=0 Y=0 Z=0"})
+            self.robot.home_robot()
+            return jsonify({"status": "Success", "message": "Robot homed. Current position: X=0 Y=0 Z=0"})
         except Exception as e:
-            return jsonify({"status": "Error", "message": f"Error processing request: {e}"}), 500
+            return jsonify({"status": "Error", "message": f"Error processing home_robot command: {e}"}), 500
 
-# Start the Flask server
+    def run(self, host, port, debug):
+        self.app.run(host=host, port=port, debug=debug)
+
+
 if __name__ == "__main__":
-    Robot_Control_Server.run(host='127.0.0.1', port=80, debug=False)
+    robot = RobotObject()
+    server = RobotServer(robot)
+    server.run(host='127.0.0.1', port=80, debug=False)
