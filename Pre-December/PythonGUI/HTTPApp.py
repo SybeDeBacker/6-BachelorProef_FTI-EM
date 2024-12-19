@@ -4,7 +4,6 @@ from threading import Thread, Timer
 import queue
 import json
 import requests
-from time import sleep
 
 class HTTPClientApp:
     def __init__(self, master):
@@ -22,8 +21,8 @@ class HTTPClientApp:
 
         # Coordinate system options
         self.coord_systems = {
-            "Cartesian Absolute": "cartesian_abs",
-            "Cartesian Relative": "cartesian_rel",
+            "Cartesian Absolute": "cartesian_absolute",
+            "Cartesian Relative": "cartesian_relative",
             "Polar": "polar"
         }
         
@@ -88,8 +87,8 @@ class HTTPClientApp:
         
         # Create position entry fields
         self.position_labels = {
-            "cartesian_abs": ["X:", "Y:", "Z:"],
-            "cartesian_rel": ["ΔX:", "ΔY:", "ΔZ:"],
+            "cartesian_absolute": ["X:", "Y:", "Z:"],
+            "cartesian_relative": ["ΔX:", "ΔY:", "ΔZ:"],
             "polar": ["R:", "θ:", "Z:"]
         }
         

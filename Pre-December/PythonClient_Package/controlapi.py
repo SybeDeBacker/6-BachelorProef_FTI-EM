@@ -1,22 +1,7 @@
-import socket
 import json
-from threading import Thread, Lock
 import requests
 from time import sleep
-from icmplib import ping
-
-
-
-class Point:
-    def __init__(self, x, y, z, coordinate_system = None) -> None:
-        self.x = x
-        self.y = y
-        self.z = z
-        if not coordinate_system:
-            self.coordinate_system = "cartesian_absolute"
-        else:
-            self.coordinate_system = coordinate_system
-        pass
+from .point import Point
 
 class RobotControlAPI:
     def __init__(self, server_url = "http://10.0.1.250", loopback=True):
@@ -27,11 +12,11 @@ class RobotControlAPI:
 
         # Define coordinate systems
         self.coord_systems = {
-            "cartesian_abs": ["X", "Y", "Z"],
-            "cartesian_rel": ["ΔX", "ΔY", "ΔZ"],
+            "cartesian_absolute": ["X", "Y", "Z"],
+            "cartesian_relative": ["ΔX", "ΔY", "ΔZ"],
             "polar": ["R", "θ", "Z"]
         }
-        self.current_coord_system = "cartesian_abs"  # Default to cartesian absolute
+        self.current_coord_system = "cartesian_absolute"  # Default to cartesian absolute
 
         # Initialize client variables
         self.client_socket = None
@@ -77,16 +62,20 @@ class RobotControlAPI:
         print("Invalid coordinate system")
         return {"status": "error", "message": "Invalid coordinate system"}
 
-    def move(self, c:Point = Point(None,None,None), x = None, y=None, z=None, coordinate_system=None):
+    def move(self, point:Point = Point(0,0,0), x = None, y=None, z=None, coordinate_system=None):
         """Sends a movement command with the current coordinate system."""
         if not self.connected:
             print("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
         
-        if not c and (x and y and z):
-            c = Point(x,y,z)
-        elif not c:
-            print("Given point is invalid: Error")
+        if (x and y and z):
+            try:
+                (x,y,z) = (float(x),float(y),float(z))
+            except ValueError as e:
+                print(f"Given point is invalid: {e}")
+        elif point == Point(0,0,0):
+            print("Returning to home")
+            return self.send_home()
 
 
         if not coordinate_system:
@@ -96,15 +85,19 @@ class RobotControlAPI:
             "type": "move",
             "coordinate_system": self.current_coord_system,
             "data": {
-                "x" if coordinate_system.startswith("cartesian") else "r": c.x,
-                "y" if coordinate_system.startswith("cartesian") else "theta": c.y,
-                "z": c.z
+                "x" if coordinate_system.startswith("cartesian") else "r": point.x,
+                "y" if coordinate_system.startswith("cartesian") else "theta": point.y,
+                "z": point.z
             }
         }
 
         command_str = json.dumps(command)
         self.send_message(command_str,"move")
-        return{"status": "success", "message": f"Move command sent: {c.x}, {c.y}, {c.z}"}
+        return{"status": "success", "message": f"Move command sent: {point.x}, {point.y}, {point.z}"}
+
+    def send_home(self):
+        self.send_message(json.dumps({"type": "home_robot"}),"home_robot")
+        return{"status": "success", "message": "Home command sent"}
 
     def request_position(self):
         """Requests the robot's current position."""
@@ -160,27 +153,3 @@ class RobotControlAPI:
                     return responsejson
             except requests.exceptions.RequestException as e:
                 print(f"Error sending message: {e}")
-
-# Example: Send a "MOVE" command
-if __name__ == "__main__":
-    # Set the IP and port of the Arduino robot
-    ROBOT_IP = '10.0.1.250'  # Arduino's IP address (set in your Arduino sketch)
-    # Connect to the robot server
-    
-    Robot = RobotControlAPI("http://10.0.1.250")
-
-    # List of coordinates to send
-    coordinates = [
-        Point(1, 2, 3),
-        Point(10, 11, 12),
-        Point(58, 25, 10),
-        Point(5, 10, 15),
-        Point(150, 110, 120),
-        Point(580, 250, 100)
-    ]
-
-    # Start a loop to send commands and pings
-    while True:
-        for c in coordinates:
-            Robot.move(c = c)
-        break  # Exit the loop after sending all commands

@@ -121,10 +121,10 @@ class RobotServer:
             if not coord_system or not data:
                 return jsonify({"status": "Error", "message": "Invalid command format"}), 400
 
-            if coord_system == "cartesian_abs":
+            if coord_system == "cartesian_absolute":
                 x, y, z = float(data["x"]), float(data["y"]), float(data["z"])
 
-            elif coord_system == "cartesian_rel":
+            elif coord_system == "cartesian_relative":
                 dx, dy, dz = float(data["x"]), float(data["y"]), float(data["z"])
                 current_pos = self.Robot.get_current_position()
                 x, y, z = current_pos.x + dx, current_pos.y + dy, current_pos.z + dz
@@ -209,11 +209,11 @@ class RobotControlAPI:
 
         # Define coordinate systems
         self.coord_systems = {
-            "cartesian_abs": ["X", "Y", "Z"],
-            "cartesian_rel": ["ΔX", "ΔY", "ΔZ"],
+            "cartesian_absolute": ["X", "Y", "Z"],
+            "cartesian_relative": ["ΔX", "ΔY", "ΔZ"],
             "polar": ["R", "θ", "Z"]
         }
-        self.current_coord_system = "cartesian_abs"  # Default to cartesian absolute
+        self.current_coord_system = "cartesian_absolute"  # Default to cartesian absolute
 
         # Initialize client variables
         self.client_socket = None
