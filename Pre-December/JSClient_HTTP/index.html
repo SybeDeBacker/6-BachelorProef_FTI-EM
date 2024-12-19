@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Control Client</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Robot Control Client</h1>
+    <div id="controls">
+        <label>Coordinate System:</label>
+        <select id="coordSystem">
+            <option value="cartesian_abs">Cartesian Absolute</option>
+            <option value="cartesian_rel">Cartesian Relative</option>
+            <option value="polar">Polar</option>
+        </select>
+
+        <h2>Position Control</h2>
+        <label>X:</label> <input id="x" type="number" value="0"><br>
+        <label>Y:</label> <input id="y" type="number" value="0"><br>
+        <label>Z:</label> <input id="z" type="number" value="0"><br>
+        <button id="moveButton">Move</button>
+        <button id="requestButton">Request Position</button>
+
+        <h2>Pipet Control</h2>
+        <label>Pipet Level:</label>
+        <input id="pipetLevel" type="number" value="0">
+        <button id="pipetButton">Set Pipet</button>
+    </div>
+
+    <h2>Status</h2>
+    <label id="statusLabel">Disconnected</label>
+    <textarea id="messageArea" readonly></textarea>
+    <script src="renderer.js"></script>
+</body>
+</html>
