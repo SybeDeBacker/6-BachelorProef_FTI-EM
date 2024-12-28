@@ -74,5 +74,6 @@ class RobotServer:
         except Exception as e:
             return jsonify({"status": "Error", "message": f"Error processing home_robot command: {e}"}), 500
 
-    def run(self, host, port, debug):
-        self.app.run(host=host, port=port, debug=debug)
+    def run(self, host, port):
+        from waitress import serve
+        serve(self.app, host=host, port=port)
