@@ -76,4 +76,5 @@ class RobotServer:
 
     def run(self, host, port):
         from waitress import serve
+        print(fr"* Running on {host}:{port}")
         serve(self.app, host=host, port=port)
