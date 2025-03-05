@@ -6,3 +6,5 @@ JS GUI
 .vscode
 serial_test
 __pycache__
+serial_comms.py
+hostname.py
