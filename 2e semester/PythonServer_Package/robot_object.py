@@ -1,6 +1,6 @@
 import serial # Module needed for serial communication
 import logging
-from json import dumps as jsonify
+from json import loads as dictify
 
 class RobotObject:
     def __init__(self):
@@ -32,7 +32,7 @@ class RobotObject:
 
         self.send_command("Ping")
 
-    def send_command(self, command: str):
+    def send_command(self, command: str) -> dict:
         try:
             self.ser.flush()
         except Exception as e:
@@ -40,8 +40,7 @@ class RobotObject:
         print(f"Command sent over serial: {command}")
         self.ser.write(command.encode('utf-8'))
 
-        print(self.receive_response())
-        return
+        return self.receive_response()
 
     def aspirate_pipette(self, volume: int, rate: int):
         aspiration_command = f"A{volume} R{rate}"
@@ -96,18 +95,26 @@ class RobotObject:
         return (self.safe_bounds[0] <= self.current_volume + volume <= self.safe_bounds[1])
 
     def zero_robot(self):
-        self.current_volume = 0
-
-    def receive_response(self):
-        while (1):
-            while (not self.ser.in_waiting):
-                pass
-            while (self.ser.in_waiting):
-                # Receive data from the Arduino
-                receive_string = self.ser.readline()
-                # Print the data received from Arduino to the terminal
-            return(receive_string.decode('utf-8', 'replace').rstrip())
-            break
+        response: dict = self.send_command("Z")
+        status = response["status"] == "success"
+        self.current_volume = 0 if status else self.current_volume
+        if not status:
+            raise Exception("Arduino failed to zero robot")
+    def receive_response(self) -> dict:
+        try:
+            while (1):
+                while (not self.ser.in_waiting):
+                    pass
+                while (self.ser.in_waiting):
+                    # Receive data from the Arduino
+                    receive_string = self.ser.readline()
+                    # Print the data received from Arduino to the terminal
+                    print(receive_string.decode('utf-8', 'replace').rstrip())
+                return dictify(str(receive_string.decode('utf-8', 'replace').rstrip()))
+            else:
+                return {"status":"error","message":"No response from Arduino"}
+        except:
+            return {"status":"error","message":"No response from Arduino"}
 
     def set_safe_bounds(self, safe_bounds: list[int]):
         self.safe_bounds = safe_bounds

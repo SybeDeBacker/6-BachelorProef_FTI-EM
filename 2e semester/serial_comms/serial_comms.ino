@@ -46,7 +46,7 @@ String execute_command(String data) {
     
     return dispense(dispense_volume, dispense_rate);
   }
-  else if (data.indexOf('E')==0){
+  else if (data == "E"){
     return eject();
   }
   else if (data.indexOf('S')==0){
@@ -66,7 +66,10 @@ String execute_command(String data) {
     return ("{'status':'succes'}");
   }
   else if (data == "Ping"){
-    return("Pong");
+    return("{'status':'success','message':'pong'}");
+  }
+  else if (data == "Z"){
+    return("{'status':'success'}");
   }
   else {return ("{'status':'error','message':'No valid parameters given " +String(data)+"'}");}
 }
