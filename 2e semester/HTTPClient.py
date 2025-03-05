@@ -10,10 +10,13 @@ if __name__ == "__main__":
 
     # Start a loop to send commands and pings
     Robot.aspirate(10, 5)
+    Robot.request_position()
     Robot.aspirate(20, 10)
     Robot.dispense(10, 5)
+    Robot.request_position()
     Robot.dispense(30, 10)
+    Robot.request_position()
     Robot.set_lead(10)
-    Robot.set_microstep_size(10)
-    Robot.eject_pipette()
+    Robot.set_microstep_size(256)
+    Robot.eject_tip()
     Robot.zero_robot()

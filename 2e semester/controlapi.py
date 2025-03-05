@@ -1,6 +1,7 @@
 import json
 import requests
 from time import sleep
+import logging
 
 class RobotControlAPI:
     def __init__(self, server_url = "http://10.0.1.250", loopback=True):
@@ -74,7 +75,7 @@ class RobotControlAPI:
         self.send_message(command_str,"dispense")
         return{"status": "success", "message": f"Dispense command sent: {volume} ml at {rate} ml/s"}
 
-    def eject_pipette(self):
+    def eject_tip(self):
         """Sends an eject tip command."""
         if not self.connected:
             print("Move command not sent: Not connected to server")
@@ -93,8 +94,7 @@ class RobotControlAPI:
             print("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
-        self.send_message(json.dumps({"type": "request"}),"request")
-        print("Position request sent")
+        self.send_message(json.dumps({"type": "volume_request"}),"request")
         return {"status": "success", "message": "Position request sent"}
 
     def set_microstep_size(self, microstep: int):
@@ -108,10 +108,8 @@ class RobotControlAPI:
             "volume_to_travel_ratio": 0
             }),"set_parameters")
         
-        print(f"Changing microstep size to {microstep}")
         return {"status": "success", "message": f"Microstep size set to {microstep}"}
     
-
     def set_lead(self, lead: int):
         if not self.connected:
             print("Request failed: Not connected to server")
@@ -123,7 +121,6 @@ class RobotControlAPI:
             "volume_to_travel_ratio": 0
             }),"set_parameters")
         
-        print(f"Changing lead to {lead}")
         return {"status": "success", "message": f"Lead set to {lead}"}
     
     def set_volume_to_travel_ratio(self, ratio: int):
@@ -139,7 +136,6 @@ class RobotControlAPI:
         
         print(f"Changing ratio to {ratio}")
         return {"status": "success", "message": f"Ratio set to {ratio}"}
-
 
     def get_status(self):
         """Checks and returns the current connection status."""
@@ -163,24 +159,24 @@ class RobotControlAPI:
     def send_message(self, message:str, endpoint:str):
         if self.connected:
             try:
+                print(f"Sending message: {message}")
                 # Send the HTTP POST request to the server with the message
                 # Change this line in your Python client:
-                print(message)
-                print(f"{self.server_url}/{endpoint}")
-                print(endpoint)
                 if endpoint == "aspirate" or endpoint == "dispense" or endpoint == "set_parameters":
                     response = requests.post(f"{self.server_url}/{endpoint}", json=json.loads(message))
                 else:
                     response = requests.get(f"{self.server_url}/{endpoint}")
-
-                print(response)
-                if response.status_code == 200:
-                    print(response.text)
-                    responsejson = json.loads(response.text)
-                    return responsejson
+                status_code = response.status_code
+                response = response.json()
+                if status_code == 200:
+                    print(response["message"],"\n")
+                    return response
                 else:
-                    print(response.text)
-                    responsejson = json.loads(response.text)
-                    return responsejson
+                    print(response["message"],"\n")
+                    return response
             except requests.exceptions.RequestException as e:
-                print(f"Error sending message: {e}")
+                self.check_server_availability()
+                if (not self.connected):
+                    print(f"Server has disconnected")
+                else:
+                    print(f"Error sending message: {e}")

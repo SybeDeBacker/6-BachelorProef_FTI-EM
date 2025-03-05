@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import math
 from .robot_object import RobotObject
 
 class RobotServer:
@@ -23,12 +22,13 @@ class RobotServer:
             rate = command.get("rate")
 
             if not self.robot.is_action_safe(volume):
-                return jsonify({"status": "Error", "message": "Position out of safe bounds"}), 400
+                return jsonify({"status": "Error", "message": "Error processing aspirate command: Position out of safe bounds"}), 400
 
             self.robot.aspirate_pipette(volume=volume, rate=rate)
             return jsonify({"status": "Success", "message": f"Aspirated {volume} ml at a rate of {rate} ml/s"})
-        
         except Exception as e:
+            if str(e) == "13":
+                e = self.handle_serial_error()
             return jsonify({"status": "Error", "message": f"Error processing aspirate command: {e}"}), 500
 
     def handle_dispense_command(self):
@@ -38,14 +38,26 @@ class RobotServer:
             rate = command.get("rate")
 
             if not self.robot.is_action_safe(-volume):
-                return jsonify({"status": "Error", "message": "Position out of safe bounds"}), 400
+                return jsonify({"status": "Error", "message": "Error processing dispense command: Position out of safe bounds"}), 400
 
             self.robot.dispense_pipette(volume=volume, rate=rate)
             return jsonify({"status": "Success", "message": f"Dispensed {volume} ml at a rate of {rate} ml/s"})
         
         except Exception as e:
+            if e == 13:
+                e = self.handle_serial_error()
             return jsonify({"status": "Error", "message": f"Error processing dispense command: {e}"}), 500
 
+    def handle_serial_error(self):
+        error = "Serial not connected"
+        width = len(str(error))+10
+        errorstring = f"""\033[31m
+{"-"*width}
+{"Error opening serial port" : ^{width}}
+{str(error): ^{width}}
+{"-"*width}\033[0m"""
+        return errorstring
+    
     def handle_ping(self):
         return jsonify({"status": "Success", "message": "pong"})
 
@@ -62,18 +74,21 @@ class RobotServer:
             microsteps = command.get("stepper_pipet_microsteps")
             lead = command.get("pipet_lead")
             vtr = command.get("volume_to_travel_ratio")
-            self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)
-
-            return jsonify({"status": "Success", "message": f"Set parameters"})
+            return jsonify(self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)),500
         
         except Exception as e:
-            return jsonify({"status": "Error", "message": f"Error processing parameter set command: {e}"}), 500
+            if str(e) == "13":
+                e = self.handle_serial_error()
+            return jsonify({"status": "Eject Error", "message": f"Error processing parameter set command: {e}"}), 500
 
     def handle_eject(self):
         try:
             self.robot.eject_tip()
             return jsonify({"status": "Success", "message": "Tip ejected"})
         except Exception as e:
+            print("Eject", e)
+            if str(e) == "13":
+                e = self.handle_serial_error()
             return jsonify({"status": "Error", "message": f"Error processing eject_tip command: {e}"}), 500
 
     def zero_robot(self):
