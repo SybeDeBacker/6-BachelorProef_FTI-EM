@@ -50,13 +50,15 @@ class RobotObject:
         self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
 
     def setup_logging(self):
-        log_file_path = "2e semester/PythonServer_Package/logs/object.log"  # Relative path
+        log_file_path_object = "2e semester/PythonServer_Package/logs/object.log"  # Relative path
+        log_file_path_common = "2e semester/PythonServer_Package/logs/common_log.log"  # Relative path
 
         # Ensure the logs directory exists
-        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+        os.makedirs(os.path.dirname(log_file_path_object), exist_ok=True)
+        os.makedirs(os.path.dirname(log_file_path_common), exist_ok=True)
 
         log_formatter_robot = colorlog.ColoredFormatter(
-            f"%(log_color)s%(asctime)s %(levelname)-12s {"RobotObject":<13}%(reset)s%(message)s", 
+            f"%(log_color)s%(asctime)s %(levelname)-12s{"RobotObject":<13}%(reset)s%(message)s", 
             log_colors={
                 'DEBUG': 'green',
                 'INFO': 'green',
@@ -72,16 +74,21 @@ class RobotObject:
         console_handler_robot.setFormatter(log_formatter_robot)
 
         file_formatter_object = logging.Formatter(
-            "%(asctime)s %(levelname)-12s Server        %(message)s",
+            f"%(asctime)s %(levelname)-12s{"RobotObject":<13}%(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        file_handler_object = logging.FileHandler(log_file_path, mode="a")
+        file_handler_object = logging.FileHandler(log_file_path_object, mode="a")
         file_handler_object.setFormatter(file_formatter_object)
+
+        file_handler_common_object = logging.FileHandler(log_file_path_common, mode="a")
+        file_handler_common_object.setFormatter(file_formatter_object)
 
         # Set up the logger for RobotObject
         self.logger_robot = logging.getLogger("RobotObject")
         self.logger_robot.setLevel(logging.INFO)  # Adjust log level as needed
         self.logger_robot.addHandler(console_handler_robot)
+        self.logger_robot.addHandler(file_handler_object)
+        self.logger_robot.addHandler(file_handler_common_object)
         self.logger_robot.propagate = False
         self.logger_robot.info("Robot logging set up")
 

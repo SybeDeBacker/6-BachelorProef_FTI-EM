@@ -25,13 +25,14 @@ class RobotServer:
         self.app.add_url_rule('/eject_tip', 'eject_tip', self.handle_eject, methods=['GET'])
 
     def setup_logging(self):
-        log_file_path = "2e semester/PythonServer_Package/logs/server.log"  # Relative path
-
-        # Ensure the logs directory exists
-        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+        log_file_path_server = "2e semester/PythonServer_Package/logs/server.log"  # Relative path
+        log_file_path_common = "2e semester/PythonServer_Package/logs/common_log.log"  # Relative path
+        
+        os.makedirs(os.path.dirname(log_file_path_server), exist_ok=True)
+        os.makedirs(os.path.dirname(log_file_path_common), exist_ok=True)
 
         log_formatter_server = colorlog.ColoredFormatter(
-            f"%(log_color)s%(asctime)s %(levelname)-12s {'Server':<13}%(reset)s%(message)s",
+            f"%(log_color)s%(asctime)s %(levelname)-12s{'Server':<13}%(reset)s%(message)s",
             log_colors={
                 'DEBUG': 'cyan',
                 'INFO': 'cyan',
@@ -46,19 +47,23 @@ class RobotServer:
         console_handler_server.setFormatter(log_formatter_server)
 
         file_formatter_server = logging.Formatter(
-            "%(asctime)s %(levelname)-12s Server        %(message)s",
+            f"%(asctime)s %(levelname)-12s{'Server':<13}%(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        file_handler_server = logging.FileHandler(log_file_path, mode="a")
+        file_handler_server = logging.FileHandler(log_file_path_server, mode="a")
         file_handler_server.setFormatter(file_formatter_server)
+
+        file_handler_common_server = logging.FileHandler(log_file_path_common, mode="a")
+        file_handler_common_server.setFormatter(file_formatter_server)
 
         self.logger_server = logging.getLogger("Server")
         self.logger_server.setLevel(logging.INFO)
         self.logger_server.addHandler(console_handler_server)
         self.logger_server.addHandler(file_handler_server)
+        self.logger_server.addHandler(file_handler_common_server)
         self.logger_server.propagate = False
 
-        self.logger_server.info(f"Server logging initialized. Logs are saved at: {log_file_path}")
+        self.logger_server.info(f"Server logging initialized. Logs are saved at: {log_file_path_server} and {log_file_path_common}")
 
     def handle_aspirate_command(self):
         try:
