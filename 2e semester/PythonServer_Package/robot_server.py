@@ -59,7 +59,7 @@ class RobotServer:
                 return jsonify({"status": "Error", "message": "Error processing aspirate command: Position out of safe bounds"}), 400
 
             self.robot.aspirate_pipette(volume=volume, rate=rate)
-            return jsonify({"status": "Success", "message": f"Aspirated {volume} ml at a rate of {rate} ml/s"})
+            return jsonify({"status": "Success", "message": f"Aspirated {volume} ul at a rate of {rate} ul/s"})
         except Exception as e:
             self.logger_server.error(f"Server: Error processing aspirate command: {e}")
             if str(e) == "13":
@@ -78,7 +78,7 @@ class RobotServer:
                 return jsonify({"status": "Error", "message": "Error processing dispense command: Position out of safe bounds"}), 400
 
             self.robot.dispense_pipette(volume=volume, rate=rate)
-            return jsonify({"status": "Success", "message": f"Dispensed {volume} ml at a rate of {rate} ml/s"})
+            return jsonify({"status": "Success", "message": f"Dispensed {volume} ul at a rate of {rate} ul/s"})
         
         except Exception as e:
             self.logger_server.error(f"Server: Error processing dispense command: {e}")
@@ -104,8 +104,8 @@ class RobotServer:
     def handle_request(self):
         try:
             current_pos = self.robot.get_current_volume()
-            self.logger_server.info(f"Server received volume request: Current volume: {current_pos} ml")
-            return jsonify({"status": "Success", "message": f"Current volume: {current_pos} ml"})
+            self.logger_server.info(f"Server received volume request: Current volume: {current_pos} ul")
+            return jsonify({"status": "Success", "message": f"Current volume: {current_pos} ul"})
         except Exception as e:
             self.logger_server.error(f"Server: Error processing request: {e}")
             return jsonify({"status": "Error", "message": f"Error processing request: {e}"}), 500
