@@ -45,35 +45,35 @@ class RobotControlAPI:
             self.connected = False
             return False
 
-    def aspirate(self, volume: int, rate:int):
+    def aspirate(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
         if not self.connected:
             print("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         command = {
-            "volume": volume,
-            "rate": rate
+            "volume": volume_in_ul,
+            "rate": rate_in_ul_per_s
         }
 
         command_str = json.dumps(command)
         self.send_message(command_str,"aspirate")
-        return{"status": "success", "message": f"Aspirate command sent: {volume} ml at {rate} ml/s"}
+        return{"status": "success", "message": f"Aspirate command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
 
-    def dispense(self, volume: int, rate:int):
+    def dispense(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
         if not self.connected:
             print("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         command = {
-            "volume": volume,
-            "rate": rate
+            "volume": volume_in_ul,
+            "rate": rate_in_ul_per_s
         }
 
         command_str = json.dumps(command)
         self.send_message(command_str,"dispense")
-        return{"status": "success", "message": f"Dispense command sent: {volume} ml at {rate} ml/s"}
+        return{"status": "success", "message": f"Dispense command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
 
     def eject_tip(self):
         """Sends an eject tip command."""
@@ -110,20 +110,20 @@ class RobotControlAPI:
         
         return {"status": "success", "message": f"Microstep size set to {microstep}"}
     
-    def set_lead(self, lead: int):
+    def set_lead(self, lead_in_mm_per_rotation: int):
         if not self.connected:
             print("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": 0,
-            "pipet_lead": lead,
+            "pipet_lead": lead_in_mm_per_rotation,
             "volume_to_travel_ratio": 0
             }),"set_parameters")
         
-        return {"status": "success", "message": f"Lead set to {lead}"}
+        return {"status": "success", "message": f"Lead set to {lead_in_mm_per_rotation} mm/rev"}
     
-    def set_volume_to_travel_ratio(self, ratio: int):
+    def set_volume_to_travel_ratio(self, ratio_in_ul_per_mm: int):
         if not self.connected:
             print("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
@@ -131,11 +131,11 @@ class RobotControlAPI:
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": 0,
             "pipet_lead": 0,
-            "volume_to_travel_ratio": ratio
+            "volume_to_travel_ratio": ratio_in_ul_per_mm
             }),"set_parameters")
         
-        print(f"Changing ratio to {ratio}")
-        return {"status": "success", "message": f"Ratio set to {ratio}"}
+        print(f"Changing ratio to {ratio_in_ul_per_mm}")
+        return {"status": "success", "message": f"Ratio set to {ratio_in_ul_per_mm} ul/mm"}
 
     def get_status(self):
         """Checks and returns the current connection status."""

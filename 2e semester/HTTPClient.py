@@ -8,8 +8,10 @@ if __name__ == "__main__":
     Robot = RobotControlAPI("http://10.0.1.250")
 
     # Start a loop to send commands and pings
+    Robot.set_lead(1)
+    Robot.set_microstep_size(16)
     Robot.zero_robot()
-    Robot.aspirate(10, 5)
+    Robot.aspirate(100, 50)
     Robot.request_position()
     Robot.aspirate(20, 10)
     Robot.dispense(10, 5)

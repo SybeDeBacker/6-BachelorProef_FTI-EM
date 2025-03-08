@@ -24,68 +24,101 @@ class RobotObject:
 {"Error opening serial port" : ^{width}}
 {str(e): ^{width}}
 {"-"*width}\033[0m""")
-            exit(1)
+            raise Exception(13)
         self.current_volume = 0
         self.safe_bounds = [0, 1000]
         self.stepper_pipet_microsteps = 16
         self.pipet_lead = 1
-        self.volume_to_travel_ratio = 0.1
+        self.volume_to_travel_ratio = 100
 
+        self.ser.flush()  
+        if self.ser.in_waiting:    
+            self.receive_response(print_confirmation=False)
         self.send_command("Ping")
 
-    def send_command(self, command: str) -> dict:
+        self.set_parameters(self.stepper_pipet_microsteps,self.pipet_lead,self.volume_to_travel_ratio,print_confirmation=False)
+
+    def send_command(self, command: str, print_confirmation: bool = False) -> dict:
         try:
             self.ser.flush()
         except Exception as e:
             raise Exception(13)
-        print(f"Command sent over serial: {command}")
+        
+        if print_confirmation:
+            logging.info(f"Sent command: {command}")
+            print(f"Command sent over serial: {command}")
         self.ser.write(command.encode('utf-8'))
 
-        return self.receive_response()
+        return self.receive_response(print_confirmation=print_confirmation)
 
-    def aspirate_pipette(self, volume: int, rate: int):
+    def aspirate_pipette(self, volume: int, rate: int, print_confirmation: bool = True):
+        if not self.is_action_safe(volume):
+            logging.warning(f"Action unsafe: Volume {self.current_volume + volume} is out of bounds!")
+            raise Exception("Position out of safe bounds")
+        if volume < 0 or rate < 0:
+            raise Exception("Volume and rate must be positive")
+        
+        if print_confirmation:
+            print(f"Aspirating {volume} ul at a rate of {rate} ul/s")
+
         aspiration_command = f"A{volume} R{rate}"
-        self.send_command(aspiration_command)
-        print(f"Aspirating {volume} ml at a rate of {rate} ml/s")
-
+        success = self.send_command(aspiration_command, print_confirmation=print_confirmation)["status"] == "success"
+        if not success:
+            raise Exception("Arduino failed to aspirate pipette")
+        
         self.current_volume += volume
-        print(f"Aspirated by {volume} ml. Current volume: {self.current_volume} ml")
 
-    def dispense_pipette(self, volume: int, rate: int):
+        if print_confirmation:
+            print(f"Aspirated by {volume} ul. Current volume: {self.current_volume} ul")
+
+    def dispense_pipette(self, volume: int, rate: int, print_confirmation: bool = True):
+        if not self.is_action_safe(-volume):
+            logging.warning(f"Action unsafe: Volume {self.current_volume + volume} is out of bounds!")
+            raise Exception("Position out of safe bounds")
+        if volume < 0 or rate < 0:
+            raise Exception("Volume and rate must be positive")
+        
         dispense_command = f"D{volume} R{rate}"
-        self.send_command(dispense_command)
-        print(f"Dispensing {volume} ml at a rate of {rate} ml/s")
+        if print_confirmation:
+            print(f"Dispensing {volume} ul at a rate of {rate} ul/s")
 
+        success = self.send_command(dispense_command, print_confirmation=print_confirmation)["status"] == "success"
+        if not success:
+            raise Exception("Arduino failed to dispense pipette")
+        
         self.current_volume -= volume
-        print(f"Dispensed by {volume} ml. Current volume: {self.current_volume} ml")
 
-    def eject_tip(self):
+        if print_confirmation:
+            print(f"Dispensed by {volume} ul. Current volume: {self.current_volume} ul")
+
+    def eject_tip(self,print_confirmation: bool = True):
         eject_tip_command = "E"
-        self.send_command(eject_tip_command)
+        self.send_command(eject_tip_command, print_confirmation = print_confirmation)
+
         print("Ejecting tip")
 
         print("Tip ejected")
 
-    def set_parameters(self, stepper_pipet_microsteps: int=0, pipet_lead: int=0, volume_to_travel_ratio: int=0):
+    def set_parameters(self, stepper_pipet_microsteps: int=0, pipet_lead: int=0, volume_to_travel_ratio: int=0, print_confirmation: bool=True) -> dict:
         if stepper_pipet_microsteps == 0 and pipet_lead == 0 and volume_to_travel_ratio == 0:
             return {"status":"error","message":"No parameters provided"}
         if stepper_pipet_microsteps < 0 or pipet_lead < 0 or volume_to_travel_ratio < 0:
             return {"status":"error","message":"Parameters must be positive"}
-        
-        parameter_command = f"S{stepper_pipet_microsteps} L{pipet_lead} V{volume_to_travel_ratio}"
-        self.send_command(parameter_command)
 
-        self.stepper_pipet_microsteps = stepper_pipet_microsteps if stepper_pipet_microsteps >= 0 else self.stepper_pipet_microsteps
-        self.pipet_lead = pipet_lead if pipet_lead != 0 else self.pipet_lead
-        self.volume_to_travel_ratio = volume_to_travel_ratio if volume_to_travel_ratio != 0 else self.volume_to_travel_ratio
+        self.stepper_pipet_microsteps = stepper_pipet_microsteps if stepper_pipet_microsteps > 0 else self.stepper_pipet_microsteps
+        self.pipet_lead = pipet_lead if pipet_lead > 0 else self.pipet_lead
+        self.volume_to_travel_ratio = volume_to_travel_ratio if volume_to_travel_ratio > 0 else self.volume_to_travel_ratio
+
+        parameter_command = f"S{self.stepper_pipet_microsteps} L{self.pipet_lead} V{self.volume_to_travel_ratio}"
+        self.send_command(parameter_command, print_confirmation = print_confirmation)
 
         confirmation_string = ""
         confirmation_string += f"Microsteps: {self.stepper_pipet_microsteps} "*(stepper_pipet_microsteps != 0)
         confirmation_string += f"Lead: {self.pipet_lead} "*(pipet_lead != 0)
         confirmation_string += f"VolumeToTravel ratio: {self.volume_to_travel_ratio} "*(volume_to_travel_ratio != 0)
 
-        print(f"Setting Parameters: {confirmation_string}")
-
+        if print_confirmation:
+            print(f"Setting Parameters: {confirmation_string}")
 
         return {"status":"success","message":f"Parameters set: Microsteps: {self.stepper_pipet_microsteps}, Lead: {self.pipet_lead}, VolumeToTravel ratio: {self.volume_to_travel_ratio}"}
 
@@ -95,8 +128,8 @@ class RobotObject:
     def is_action_safe(self, volume: int):
         return (self.safe_bounds[0] <= self.current_volume + volume <= self.safe_bounds[1])
 
-    def zero_robot(self):
-        response: dict = self.send_command("Z")
+    def zero_robot(self, print_confirmation: bool = True):
+        response: dict = self.send_command("Z", print_confirmation=print_confirmation)
         status = response["status"] == "success"
         self.current_volume = 0 if status else self.current_volume
         if not status:
@@ -107,9 +140,11 @@ class RobotObject:
         json_string = json_string.replace("'", '"')
         # Ensure property names are enclosed in double quotes
         json_string = re.sub(r'(?<!")(\b\w+\b)(?=\s*:)', r'"\1"', json_string)
+        # Ensure values are enclosed in double quotes if they are not numbers or booleans
+        json_string = re.sub(r'(?<=: )(\b\w+\b)(?=[,}])', r'"\1"', json_string)
         return json_string
-
-    def receive_response(self) -> dict:
+    
+    def receive_response(self, print_confirmation: bool = True) -> dict:
         try:
             while True:
                 while not self.ser.in_waiting:
@@ -118,7 +153,8 @@ class RobotObject:
                     # Receive data from the Arduino
                     receive_string = self.ser.readline()
                     # Print the data received from Arduino to the terminal
-                    print(receive_string.decode('utf-8', 'replace').rstrip())
+                    if print_confirmation:
+                        print(receive_string.decode('utf-8', 'replace').rstrip())
                 try:
                     sanitized_string = self.sanitize_json(receive_string.decode('utf-8', 'replace').rstrip())
                     return dictify(sanitized_string)
@@ -128,8 +164,6 @@ class RobotObject:
         except Exception as e:
             print("except: ", e)
             return {"status": "error", "message": "No response from Arduino"}
-
-
 
     def set_safe_bounds(self, safe_bounds: list[int]):
         self.safe_bounds = safe_bounds

@@ -7,21 +7,30 @@ Website: https://automaticaddison.com
 Date: July 5, 2020
 */
 #include <MobaTools.h>
+#include "config.h"
 
 const int dirPin = 1;
 const int stepPin = 2;
 const int enablePin = 7;
+
 // Initialize the integer variables
-int STEPPER_PIPET_MICROSTEPS = 16; //microsteps
-float LEAD = 1; // mm/rev
-float VOLUME_TO_TRAVEL_RATIO = 0.1; // ml/mm
- 
+int STEPPER_PIPET_MICROSTEPS = STEPPER_PIPET_MICROSTEPS_CONFIG; //microsteps
+float LEAD = LEAD_CONFIG; // mm/rev
+float VOLUME_TO_TRAVEL_RATIO = VOLUME_TO_TRAVEL_RATIO_CONFIG; // ul/mm
+
+String DEBUG_INFO = "";
+
 MoToStepper stepper(long(200*STEPPER_PIPET_MICROSTEPS), STEPDIR);
 
 void setup(){
   // Set the baud rate  
   Serial.begin(9600); 
-  
+  Serial.println("Serial started");
+  if (USE_STEPPER_MOTOR){
+    stepper.attach(stepPin, dirPin);
+    stepper.setSpeed(200);  
+    stepper.setRampLen(20);
+  }
 }
  
 void loop() {
@@ -29,6 +38,10 @@ void loop() {
   if (Serial.available() > 0){
     String command_str = Serial.readStringUntil('\n');
     String response = execute_command(command_str);
+    if (ENABLE_DEBUG){
+      response = response.substring(0,response.length()-1);
+      response = response + ", \"debug_info\":\"" + DEBUG_INFO + "\"}";
+    }
     Serial.println(response);
   }
 }
@@ -58,12 +71,15 @@ String execute_command(String data) {
       STEPPER_PIPET_MICROSTEPS = microsteps;
     }
     if (lead > 0){
-      LEAD = microsteps;
+      LEAD = lead;
     }
     if (volume_tt_ratio > 0){
       VOLUME_TO_TRAVEL_RATIO = volume_tt_ratio;
     }
-    return ("{\"status\":\"succes\"}");
+    return "{\"status\":\"success\",\"message\":\"Microsteps " + String(STEPPER_PIPET_MICROSTEPS) +
+       " Lead " + String(LEAD, 2) + "mm/rev Volume to travel ratio " + 
+       String(VOLUME_TO_TRAVEL_RATIO, 2) + " ul/mm\"}";
+
   }
   else if (data == "Ping"){
     return("{\"status\":\"success\",\"message\":\"pong\"}");
@@ -79,12 +95,14 @@ String aspirate(float aspiration_volume, float aspiration_rate){
   float rotations = travel/LEAD;
   int steps = round(rotations*200*STEPPER_PIPET_MICROSTEPS);
 
-  float speed = aspiration_rate/VOLUME_TO_TRAVEL_RATIO;
+  float speed = 60*aspiration_rate/VOLUME_TO_TRAVEL_RATIO;
   float rpm = speed/LEAD;
-  //stepper.setSpeed(rpm);
-  //stepper.move(steps);
-  //while(stepper.moving());
-  return "{\"status\":\"succes\", \"message\": Aspirated \""+String(steps)+" steps at "+String(rpm)+" rpm\"}";
+  
+  if (moveStepper(steps, rpm)) {
+    return "{\"status\":\"success\", \"message\": \"Aspirated " + String(steps) + " steps at " + String(rpm) + " rpm\"}";
+  } else {
+    return "{\"status\":\"error\", \"message\": \"Failed to aspirate " + String(steps) + " steps at " + String(rpm) + " rpm\"}";
+  }
 }
 
 String dispense(float dispense_volume, float dispense_rate){
@@ -92,12 +110,34 @@ String dispense(float dispense_volume, float dispense_rate){
   float rotations = travel/LEAD;
   int steps = round(rotations*200*STEPPER_PIPET_MICROSTEPS);
 
-  float speed = dispense_rate/VOLUME_TO_TRAVEL_RATIO;
+  float speed = 60*dispense_rate/VOLUME_TO_TRAVEL_RATIO;
   float rpm = speed/LEAD;
 
-  return "{\"status\":\"succes\", \"message\": Dispensed \""+String(steps)+" steps at "+String(rpm)+" rpm\"}";
+  if (moveStepper(steps, rpm)) {
+    return "{\"status\":\"success\", \"message\": \"Dispensed " + String(steps) + " steps at " + String(rpm) + " rpm\"}";
+  } else {
+    return "{\"status\":\"error\", \"message\": \"Failed to dispense " + String(steps) + " steps at " + String(rpm) + " rpm\"}";
+  }
 }
 
 String eject(){
   return "{\"status\":\"succes\"}";
+}
+
+bool moveStepper(int steps, float rpm) {
+  if (!USE_STEPPER_MOTOR){return true;}
+  stepper.setSpeed(rpm);
+  stepper.move(steps);
+
+  unsigned long startTime = millis();  // Get the current time
+  unsigned long timeout = 5000;        // Set a 5-second timeout (adjust as needed)
+
+  while (stepper.moving()) {
+    if (millis() - startTime > timeout) {
+      stepper.stop();  // Stop the motor
+      return false;  // Assume failure if motor is still moving after timeout
+    }
+  }
+
+  return true;  // Movement was successful
 }
