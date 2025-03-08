@@ -1,6 +1,7 @@
 import serial # Module needed for serial communication
 import logging
-from json import loads as dictify
+import re
+from json import loads as dictify, JSONDecodeError
 
 class RobotObject:
     def __init__(self):
@@ -100,21 +101,35 @@ class RobotObject:
         self.current_volume = 0 if status else self.current_volume
         if not status:
             raise Exception("Arduino failed to zero robot")
+        
+    def sanitize_json(self, json_string: str) -> str:
+        # Replace single quotes with double quotes
+        json_string = json_string.replace("'", '"')
+        # Ensure property names are enclosed in double quotes
+        json_string = re.sub(r'(?<!")(\b\w+\b)(?=\s*:)', r'"\1"', json_string)
+        return json_string
+
     def receive_response(self) -> dict:
         try:
-            while (1):
-                while (not self.ser.in_waiting):
+            while True:
+                while not self.ser.in_waiting:
                     pass
-                while (self.ser.in_waiting):
+                while self.ser.in_waiting:
                     # Receive data from the Arduino
                     receive_string = self.ser.readline()
                     # Print the data received from Arduino to the terminal
                     print(receive_string.decode('utf-8', 'replace').rstrip())
-                return dictify(str(receive_string.decode('utf-8', 'replace').rstrip()))
-            else:
-                return {"status":"error","message":"No response from Arduino"}
-        except:
-            return {"status":"error","message":"No response from Arduino"}
+                try:
+                    sanitized_string = self.sanitize_json(receive_string.decode('utf-8', 'replace').rstrip())
+                    return dictify(sanitized_string)
+                except JSONDecodeError as e:
+                    print(f"JSON decode error: {e}")
+                    return {"status": "error", "message": "Invalid JSON response from Arduino"}
+        except Exception as e:
+            print("except: ", e)
+            return {"status": "error", "message": "No response from Arduino"}
+
+
 
     def set_safe_bounds(self, safe_bounds: list[int]):
         self.safe_bounds = safe_bounds

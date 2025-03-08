@@ -34,25 +34,25 @@ void loop() {
 }
 
 String execute_command(String data) {
-  if (data.indexOf('A')==0){
-    float aspiration_volume = data.substring(1,data.indexOf('R')-1).toFloat();
-    float asprition_rate = data.substring(data.indexOf('R')+1,data.length()).toFloat();
+  if (data.indexOf("A")==0){
+    float aspiration_volume = data.substring(1,data.indexOf("R")-1).toFloat();
+    float asprition_rate = data.substring(data.indexOf("R")+1,data.length()).toFloat();
     aspirate(aspiration_volume, asprition_rate);
     return aspirate(aspiration_volume, asprition_rate);
   }
-  else if (data.indexOf('D')==0){
-    float dispense_volume = data.substring(1,data.indexOf('R')-1).toFloat();
-    float dispense_rate = data.substring(data.indexOf('R')+1,data.length()).toFloat();
+  else if (data.indexOf("D")==0){
+    float dispense_volume = data.substring(1,data.indexOf("R")-1).toFloat();
+    float dispense_rate = data.substring(data.indexOf("R")+1,data.length()).toFloat();
     
     return dispense(dispense_volume, dispense_rate);
   }
   else if (data == "E"){
     return eject();
   }
-  else if (data.indexOf('S')==0){
-    int microsteps = data.substring(1,data.indexOf('L')-1).toInt();
-    float lead = data.substring(data.indexOf('L')+1,data.indexOf('V')-1).toFloat();
-    float volume_tt_ratio = data.substring(data.indexOf('V')+1,data.length()).toFloat();
+  else if (data.indexOf("S")==0){
+    int microsteps = data.substring(1,data.indexOf("L")-1).toInt();
+    float lead = data.substring(data.indexOf("L")+1,data.indexOf("V")-1).toFloat();
+    float volume_tt_ratio = data.substring(data.indexOf("V")+1,data.length()).toFloat();
 
     if (microsteps > 0){
       STEPPER_PIPET_MICROSTEPS = microsteps;
@@ -63,15 +63,15 @@ String execute_command(String data) {
     if (volume_tt_ratio > 0){
       VOLUME_TO_TRAVEL_RATIO = volume_tt_ratio;
     }
-    return ("{'status':'succes'}");
+    return ("{\"status\":\"succes\"}");
   }
   else if (data == "Ping"){
-    return("{'status':'success','message':'pong'}");
+    return("{\"status\":\"success\",\"message\":\"pong\"}");
   }
   else if (data == "Z"){
-    return("{'status':'success'}");
+    return("{\"status\":\"success\"}");
   }
-  else {return ("{'status':'error','message':'No valid parameters given " +String(data)+"'}");}
+  else {return ("{\"status\":\"error\",\"message\":\"No valid parameters given " +String(data)+"\"}");}
 }
 
 String aspirate(float aspiration_volume, float aspiration_rate){
@@ -84,7 +84,7 @@ String aspirate(float aspiration_volume, float aspiration_rate){
   //stepper.setSpeed(rpm);
   //stepper.move(steps);
   //while(stepper.moving());
-  return "{'status':'succes', 'message': Aspirated '"+String(steps)+" steps at "+String(rpm)+" rpm'}";
+  return "{\"status\":\"succes\", \"message\": Aspirated \""+String(steps)+" steps at "+String(rpm)+" rpm\"}";
 }
 
 String dispense(float dispense_volume, float dispense_rate){
@@ -95,9 +95,9 @@ String dispense(float dispense_volume, float dispense_rate){
   float speed = dispense_rate/VOLUME_TO_TRAVEL_RATIO;
   float rpm = speed/LEAD;
 
-  return "{'status':'succes', 'message': Dispensed '"+String(steps)+" steps at "+String(rpm)+" rpm'}";
+  return "{\"status\":\"succes\", \"message\": Dispensed \""+String(steps)+" steps at "+String(rpm)+" rpm\"}";
 }
 
 String eject(){
-  return "{'status':'succes'}";
+  return "{\"status\":\"succes\"}";
 }
