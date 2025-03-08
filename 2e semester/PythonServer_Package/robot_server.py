@@ -25,7 +25,7 @@ class RobotServer:
 
     def setup_logging(self):
         log_formatter_server = colorlog.ColoredFormatter(
-            f"%(log_color)s%(asctime)s %(levelname)s {"Server":<13}%(reset)s%(message)s",
+            f"%(log_color)s%(asctime)s %(levelname)-12s {"Server":<13}%(reset)s%(message)s",
             log_colors={
                 'DEBUG': 'cyan',
                 'INFO': 'cyan',
@@ -61,9 +61,11 @@ class RobotServer:
             self.robot.aspirate_pipette(volume=volume, rate=rate)
             return jsonify({"status": "Success", "message": f"Aspirated {volume} ul at a rate of {rate} ul/s"})
         except Exception as e:
-            self.logger_server.error(f"Server: Error processing aspirate command: {e}")
-            if str(e) == "13":
+            if str(e) == "Serial not connected":
                 e = self.handle_serial_error()
+            else:
+                self.logger_server.error(f"Server: Error processing aspirate command: {e}")
+            
             return jsonify({"status": "Error", "message": f"Error processing aspirate command: {e}"}), 500
 
     def handle_dispense_command(self):
@@ -81,22 +83,12 @@ class RobotServer:
             return jsonify({"status": "Success", "message": f"Dispensed {volume} ul at a rate of {rate} ul/s"})
         
         except Exception as e:
-            self.logger_server.error(f"Server: Error processing dispense command: {e}")
-            if str(e) == "13":
+            if str(e) == "Serial not connected":
                 e = self.handle_serial_error()
+            else:
+                self.logger_server.error(f"Server: Error processing aspirate command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing dispense command: {e}"}), 500
 
-    def handle_serial_error(self):
-        error = "Serial not connected"
-        self.logger_server.critical(error)
-        width = len(str(error))+10
-        errorstring = f"""\033[31m
-{"-"*width}
-{"Error opening serial port" : ^{width}}
-{str(error): ^{width}}
-{"-"*width}\033[0m"""
-        return errorstring
-    
     def handle_ping(self):
         self.logger_server.info("Server received ping request")
         return jsonify({"status": "Success", "message": "pong"})
@@ -120,9 +112,10 @@ class RobotServer:
             return jsonify(self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)),500
         
         except Exception as e:
-            self.logger_server.error(f"Server: Error processing set parameters command: {e}")
-            if str(e) == "13":
+            if str(e) == "Serial not connected":
                 e = self.handle_serial_error()
+            else:
+                self.logger_server.error(f"Server: Error processing aspirate command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing parameter set command: {e}"}), 500
 
     def handle_eject(self):
@@ -131,9 +124,10 @@ class RobotServer:
             self.robot.eject_tip()
             return jsonify({"status": "Success", "message": "Tip ejected"})
         except Exception as e:
-            self.logger_server.error(f"Server: Error processing eject_tip command: {e}")
-            if str(e) == "13":
+            if str(e) == "Serial not connected":
                 e = self.handle_serial_error()
+            else:
+                self.logger_server.error(f"Server: Error processing aspirate command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing eject_tip command: {e}"}), 500
 
     def zero_robot(self):
@@ -145,6 +139,17 @@ class RobotServer:
             self.logger_server.error(f"Server: Error processing zero_robot command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing zero_robot command: {e}"}), 500
 
+    def handle_serial_error(self):
+        error = "Serial not connected"
+        self.logger_server.critical(f"Server: Error processing aspirate command: {error}")
+        width = len(str(error))+10
+        errorstring = f"""\033[31m
+{"-"*width}
+{"Error opening serial port" : ^{width}}
+{str(error): ^{width}}
+{"-"*width}\033[0m"""
+        return errorstring
+        
     def run(self, host, port):
         from waitress import serve
         self.logger_server.info(f"Server running on http://{host}:{port}")

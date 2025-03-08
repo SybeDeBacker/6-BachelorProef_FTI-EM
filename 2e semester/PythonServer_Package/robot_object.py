@@ -20,7 +20,7 @@ class RobotObject:
 {"Error opening serial port" : ^{width}}
 {str(e): ^{width}}
 {"-"*width}\033[0m""")
-            raise Exception(13)
+            raise Exception("Serial not connected")
         
         self.current_volume = 0
         self.safe_bounds = [0, 1000]
@@ -32,13 +32,21 @@ class RobotObject:
         self.ser.flush()  
         if self.ser.in_waiting:    
             self.receive_response(print_confirmation=False)
-        self.send_command("Ping")
+        response = self.send_command("Ping")
 
+        if len(response)>0:
+            self.serial_connected = True
+            self.logger_robot.info("Serial responding")
+        else:
+            self.serial_connected = False
+            self.logger_robot.error("Serial not responding")
+            raise Exception("Serial not responding")
+        
         self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
 
     def setup_logging(self):
         log_formatter_robot = colorlog.ColoredFormatter(
-            f"%(log_color)s%(asctime)s %(levelname)s {"RobotObject":<13}%(reset)s%(message)s", 
+            f"%(log_color)s%(asctime)s %(levelname)-12s {"RobotObject":<13}%(reset)s%(message)s", 
             log_colors={
                 'DEBUG': 'green',
                 'INFO': 'green',
@@ -65,15 +73,28 @@ class RobotObject:
             self.ser.flush()
         except Exception as e:
             self.logger_robot.error(f"Error flushing serial port: {e}")
-            raise Exception(13)
+            self.serial_connected = False
+            raise Exception("Serial not connected")
         
         if print_confirmation:
             self.logger_robot.info(f"Sent command over Serial: {command}")
-        self.ser.write(command.encode('utf-8'))
+        
+        try:
+            self.ser.write(command.encode('utf-8'))
+        except Exception as e:
+            self.logger_robot.error(f"Error writing to serial port: {e}")
+            self.serial_connected = False
+            raise Exception("Serial not connected")
+
 
         return self.receive_response(print_confirmation=print_confirmation)
 
     def pipette_action(self, action: str, volume: int, rate: int, print_confirmation: bool = True):
+        if not self.serial_connected:
+            self.serial_connected = self.send_command("Ping")["status"] == "success"
+            if not self.serial_connected:
+                raise Exception("Serial not connected")
+            
         if not self.is_action_safe(volume if action == 'aspirate' else -volume):
             self.logger_robot.warning(f"Action unsafe: Volume {self.current_volume + volume} is out of bounds!")
             raise Exception("Position out of safe bounds")
@@ -171,7 +192,7 @@ class RobotObject:
                     return {"status": "error", "message": "Invalid JSON response from Arduino"}
         except Exception as e:
             self.logger_robot.error(f"Exception in receive_response: {e}")
-            return {"status": "error", "message": "No response from Arduino"}
+            raise Exception("Serial not connected")
 
     def set_safe_bounds(self, safe_bounds: list[int]):
         self.safe_bounds = safe_bounds
