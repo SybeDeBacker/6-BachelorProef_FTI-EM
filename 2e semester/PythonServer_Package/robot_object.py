@@ -1,22 +1,19 @@
 import serial # Module needed for serial communication
 import logging
+import colorlog
 import re
 from json import loads as dictify, JSONDecodeError
 from time import time
 
 class RobotObject:
     def __init__(self):
-        logging.basicConfig(
-            level=logging.INFO,
-            format="\033[1;36m%(asctime)s %(levelname)s %(message)s\033[0m",  # Blue color for RobotObject logs
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        self.setup_logging()
         
         # Open serial port
         try:
             self.ser = serial.Serial('COM3', 9600, timeout=1)
         except Exception as e:
-            logging.critical(f"RobotObject: Error opening serial port: {e}")
+            self.logger_robot.critical(f"Error opening serial port: {e}")
             width = len(str(e)) + 10
             print(f"""\033[31m
 {"-"*width}
@@ -39,29 +36,53 @@ class RobotObject:
 
         self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
 
+    def setup_logging(self):
+        log_formatter_robot = colorlog.ColoredFormatter(
+            f"%(log_color)s%(asctime)s %(levelname)s {"RobotObject":<13}%(reset)s%(message)s", 
+            log_colors={
+                'DEBUG': 'green',
+                'INFO': 'green',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'bold_red',
+            },
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        # Set up the logging handler with the color formatter
+        console_handler_robot = logging.StreamHandler()
+        console_handler_robot.setFormatter(log_formatter_robot)
+
+        # Set up the logger for RobotObject
+        self.logger_robot = logging.getLogger("RobotObject")
+        self.logger_robot.setLevel(logging.INFO)  # Adjust log level as needed
+        self.logger_robot.addHandler(console_handler_robot)
+        self.logger_robot.propagate = False
+        self.logger_robot.info("Robot logging set up")
+
     def send_command(self, command: str, print_confirmation: bool = False) -> dict:
         try:
             self.ser.flush()
         except Exception as e:
-            logging.error(f"RobotObject: Error flushing serial port: {e}")
+            self.logger_robot.error(f"Error flushing serial port: {e}")
             raise Exception(13)
         
         if print_confirmation:
-            logging.info(f"RobotObject: Sent command over Serial: {command}")
+            self.logger_robot.info(f"Sent command over Serial: {command}")
         self.ser.write(command.encode('utf-8'))
 
         return self.receive_response(print_confirmation=print_confirmation)
 
     def pipette_action(self, action: str, volume: int, rate: int, print_confirmation: bool = True):
         if not self.is_action_safe(volume if action == 'aspirate' else -volume):
-            logging.warning(f"RobotObject: Action unsafe: Volume {self.current_volume + volume} is out of bounds!")
+            self.logger_robot.warning(f"Action unsafe: Volume {self.current_volume + volume} is out of bounds!")
             raise Exception("Position out of safe bounds")
         
         if volume < 0 or rate < 0:
             raise Exception("Volume and rate must be positive")
         
         if print_confirmation:
-            logging.info(f"RobotObject: {action.capitalize()[:-1]}ing {volume} ul at a rate of {rate} ul/s")
+            self.logger_robot.info(f"{action.capitalize()[:-1]}ing {volume} ul at a rate of {rate} ul/s")
 
         command = f"{action[0].upper()}{volume} R{rate}"
         success = self.send_command(command, print_confirmation=print_confirmation)["status"] == "success"
@@ -71,7 +92,7 @@ class RobotObject:
         self.current_volume += volume if action == 'aspirate' else -volume
 
         if print_confirmation:
-            logging.info(f"RobotObject: {action.capitalize()}d by {volume} ul. Current volume: {self.current_volume} ul")
+            self.logger_robot.info(f"{action.capitalize()}d by {volume} ul. Current volume: {self.current_volume} ul")
 
     def aspirate_pipette(self, volume: int, rate: int, print_confirmation: bool = True):
         self.pipette_action('aspirate', volume, rate, print_confirmation)
@@ -82,10 +103,6 @@ class RobotObject:
     def eject_tip(self, print_confirmation: bool = True):
         eject_tip_command = "E"
         self.send_command(eject_tip_command, print_confirmation=print_confirmation)
-
-        if print_confirmation:
-            logging.info("RobotObject: Ejecting tip")
-            logging.info("RobotObject: Tip ejected")
 
     def set_parameters(self, stepper_pipet_microsteps: int = 0, pipet_lead: int = 0, volume_to_travel_ratio: int = 0, print_confirmation: bool = True) -> dict:
         if stepper_pipet_microsteps == 0 and pipet_lead == 0 and volume_to_travel_ratio == 0:
@@ -106,7 +123,7 @@ class RobotObject:
         confirmation_string += f"VolumeToTravel ratio: {self.volume_to_travel_ratio} " * (volume_to_travel_ratio != 0)
 
         if False: #print_confirmation:
-            logging.info(f"RobotObject: Setting Parameters: {confirmation_string}")
+            self.logger_robot.info(f"Setting Parameters: {confirmation_string}")
 
         return {"status": "success", "message": f"Parameters set: Microsteps: {self.stepper_pipet_microsteps}, Lead: {self.pipet_lead}, VolumeToTravel ratio: {self.volume_to_travel_ratio}"}
 
@@ -145,15 +162,15 @@ class RobotObject:
                     receive_string = self.ser.readline()
                     # Print the data received from Arduino to the terminal
                     if print_confirmation:
-                        logging.info("RobotObject: Received over Serial: "+receive_string.decode('utf-8', 'replace').rstrip())
+                        self.logger_robot.info("Received over Serial: "+receive_string.decode('utf-8', 'replace').rstrip())
                 try:
                     sanitized_string = self.sanitize_json(receive_string.decode('utf-8', 'replace').rstrip())
                     return dictify(sanitized_string)
                 except JSONDecodeError as e:
-                    logging.error(f"RobotObject: JSON decode error: {e}")
+                    self.logger_robot.error(f"JSON decode error: {e}")
                     return {"status": "error", "message": "Invalid JSON response from Arduino"}
         except Exception as e:
-            logging.error(f"RobotObject: Exception in receive_response: {e}")
+            self.logger_robot.error(f"Exception in receive_response: {e}")
             return {"status": "error", "message": "No response from Arduino"}
 
     def set_safe_bounds(self, safe_bounds: list[int]):
