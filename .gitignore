@@ -8,3 +8,4 @@ serial_test
 __pycache__
 serial_comms.py
 hostname.py
+logs

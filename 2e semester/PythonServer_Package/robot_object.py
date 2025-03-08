@@ -4,6 +4,7 @@ import colorlog
 import re
 from json import loads as dictify, JSONDecodeError
 from time import time
+import os
 
 class RobotObject:
     def __init__(self):
@@ -29,6 +30,9 @@ class RobotObject:
         self.volume_to_travel_ratio = 100
         self.timeout = 5
 
+        self.serial_connected = True
+
+
         self.ser.flush()  
         if self.ser.in_waiting:    
             self.receive_response(print_confirmation=False)
@@ -39,12 +43,18 @@ class RobotObject:
             self.logger_robot.info("Serial responding")
         else:
             self.serial_connected = False
+            self.ser.close()
             self.logger_robot.error("Serial not responding")
             raise Exception("Serial not responding")
         
         self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
 
     def setup_logging(self):
+        log_file_path = "2e semester/PythonServer_Package/logs/object.log"  # Relative path
+
+        # Ensure the logs directory exists
+        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+
         log_formatter_robot = colorlog.ColoredFormatter(
             f"%(log_color)s%(asctime)s %(levelname)-12s {"RobotObject":<13}%(reset)s%(message)s", 
             log_colors={
@@ -61,6 +71,13 @@ class RobotObject:
         console_handler_robot = logging.StreamHandler()
         console_handler_robot.setFormatter(log_formatter_robot)
 
+        file_formatter_object = logging.Formatter(
+            "%(asctime)s %(levelname)-12s Server        %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        file_handler_object = logging.FileHandler(log_file_path, mode="a")
+        file_handler_object.setFormatter(file_formatter_object)
+
         # Set up the logger for RobotObject
         self.logger_robot = logging.getLogger("RobotObject")
         self.logger_robot.setLevel(logging.INFO)  # Adjust log level as needed
@@ -72,9 +89,14 @@ class RobotObject:
         try:
             self.ser.flush()
         except Exception as e:
-            self.logger_robot.error(f"Error flushing serial port: {e}")
-            self.serial_connected = False
-            raise Exception("Serial not connected")
+            try:
+                self.ser.open()
+                self.ser.flush()
+            except Exception as e:
+                self.ser.close()
+                self.logger_robot.error(f"Error flushing serial port: {e}")
+                self.serial_connected = False
+                raise Exception("Serial not connected")
         
         if print_confirmation:
             self.logger_robot.info(f"Sent command over Serial: {command}")
