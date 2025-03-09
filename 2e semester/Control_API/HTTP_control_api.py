@@ -2,10 +2,13 @@ import json
 import requests
 from time import sleep
 import logging
+import os
+import colorlog
 
 class RobotControlAPI:
-    def __init__(self, server_url = "http://10.0.1.250", loopback=True):
+    def __init__(self, server_url = "http://10.0.1.250", loopback:bool=True, log_files_path:str = "C:/Users/Sybe/Documents/!UAntwerpen/6e Semester/6 - Bachelorproef/Code/Github/6-BachelorProef_FTI-EM_CoSysLab/2e semester/PythonServer_Package/logs", loopback_adress:str = "http://127.0.0.1"):
         self.server_url = server_url
+        self.loopback_adress = loopback_adress
         self.loopback = loopback
         self.connected = False
         self.HEADERSIZE = 10
@@ -16,39 +19,88 @@ class RobotControlAPI:
         self.ping_thread = None
         self.ping_interval = 5  # Ping every 5 seconds
 
+        self.setup_logging(log_files_path=log_files_path)
+
         self.check_server_availability()
         
         sleep(0.1)
 
+    def setup_logging(self,log_files_path:str):
+        log_file_path_http_client = os.path.abspath(f"{log_files_path}/http_client.log")  # Relative path
+        log_file_path_common = os.path.abspath(f"{log_files_path}/common_log.log")  # Relative path
+        
+        os.makedirs(os.path.dirname(log_file_path_http_client), exist_ok=True)
+        os.makedirs(os.path.dirname(log_file_path_common), exist_ok=True)
+
+        log_formatter_http_client = colorlog.ColoredFormatter(
+            f"%(log_color)s%(asctime)s %(levelname)-12s{'HTTP Client':<13}%(reset)s%(message)s",
+            log_colors={
+                'DEBUG': 'light_purple',
+                'INFO': 'light_purple',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'bold_red',
+            },
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        console_handler_http_client = logging.StreamHandler()
+        console_handler_http_client.setFormatter(log_formatter_http_client)
+
+        file_formatter_http_client = logging.Formatter(
+            f"%(asctime)s %(levelname)-12s{'HTTP Client':<13}%(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        file_handler_http_client = logging.FileHandler(log_file_path_http_client, mode="a")
+        file_handler_http_client.setFormatter(file_formatter_http_client)
+
+        file_handler_common_http_client = logging.FileHandler(log_file_path_common, mode="a")
+        file_handler_common_http_client.setFormatter(file_formatter_http_client)
+
+        self.logger_http_client = logging.getLogger("HTTP Client")
+        self.logger_http_client.setLevel(logging.INFO)
+        self.logger_http_client.addHandler(console_handler_http_client)
+        self.logger_http_client.addHandler(file_handler_http_client)
+        self.logger_http_client.addHandler(file_handler_common_http_client)
+        self.logger_http_client.propagate = False
+
+        self.logger_http_client.warning("Operating on HTTP Control API")
+        self.logger_http_client.info(f"HTTP Client logging initialized. Logs are saved at: {log_files_path}")
+ 
     def check_server_availability(self):
         try:
             # Attempting to ping the server to check availability
             response = requests.get(f"{self.server_url}/ping",timeout=3)
-            print("connect")
             if response.status_code == 200:
                 self.connected = True
+                self.logger_http_client.info(f"Client has connected to {self.server_url}")
             else:
                 self.connected = False
+                self.logger_http_client.warning(f"Client failed to connect to {self.server_url}.")
             return self.connected
+        
         except requests.exceptions.RequestException as e:
             if self.loopback:
-                print("loopback")
+                self.logger_http_client.warning(f"Looping back to {self.loopback_adress} because {self.server_url} did not respond")
                 try:
-                    response = requests.get("http://127.0.0.1/ping",timeout=3)
+                    response = requests.get(f"{self.loopback_adress}/ping",timeout=3)
                     if response.status_code == 200:
-                        self.server_url = "http://127.0.0.1"
+                        self.server_url = self.loopback_adress
                         self.connected = True
+                        self.logger_http_client.info(f"Client has connected to {self.server_url}")
                         return self.connected
                 except:
                     self.connected = False
-                    return self.connected
+                    self.logger_http_client.warning("Client failed to connect.")
+                    return False
             self.connected = False
+            self.logger_http_client.warning("Client failed to connect.")
             return False
 
     def aspirate(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
         if not self.connected:
-            print("Move command not sent: Not connected to server")
+            self.logger_http_client.error("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         command = {
@@ -63,7 +115,7 @@ class RobotControlAPI:
     def dispense(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
         if not self.connected:
-            print("Move command not sent: Not connected to server")
+            self.logger_http_client.error("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         command = {
@@ -78,7 +130,7 @@ class RobotControlAPI:
     def eject_tip(self):
         """Sends an eject tip command."""
         if not self.connected:
-            print("Move command not sent: Not connected to server")
+            self.logger_http_client.error("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         self.send_message(json.dumps({"type": "eject_tip"}),"eject_tip")
@@ -91,7 +143,7 @@ class RobotControlAPI:
     def request_position(self):
         """Requests the robot's current position."""
         if not self.connected:
-            print("Request failed: Not connected to server")
+            self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
         self.send_message(json.dumps({"type": "volume_request"}),"request")
@@ -99,9 +151,11 @@ class RobotControlAPI:
 
     def set_microstep_size(self, microstep: int):
         if not self.connected:
-            print("Request failed: Not connected to server")
+            self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
+        self.logger_http_client.info(f"Changing microstep size to {microstep}")
+
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": microstep,
             "pipet_lead": 0,
@@ -112,9 +166,11 @@ class RobotControlAPI:
     
     def set_lead(self, lead_in_mm_per_rotation: int):
         if not self.connected:
-            print("Request failed: Not connected to server")
+            self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
+        self.logger_http_client.info(f"Changing lead to {lead_in_mm_per_rotation}")
+
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": 0,
             "pipet_lead": lead_in_mm_per_rotation,
@@ -125,25 +181,27 @@ class RobotControlAPI:
     
     def set_volume_to_travel_ratio(self, ratio_in_ul_per_mm: int):
         if not self.connected:
-            print("Request failed: Not connected to server")
+            self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
+        self.logger_http_client.info(f"Changing ratio to {ratio_in_ul_per_mm}")
+
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": 0,
             "pipet_lead": 0,
             "volume_to_travel_ratio": ratio_in_ul_per_mm
             }),"set_parameters")
         
-        print(f"Changing ratio to {ratio_in_ul_per_mm}")
         return {"status": "success", "message": f"Ratio set to {ratio_in_ul_per_mm} ul/mm"}
 
     def get_status(self):
         """Checks and returns the current connection status."""
+        self.logger_http_client.info("Status request received")
         if self.connected:
-            print(f"Connected to server at: {self.server_url}")
-            return {"status": "connected", "message": "Connected to server"}
+            self.logger_http_client.info(f"Connected to server at: {self.server_url}")
+            return {"status": "connected", "message": f"Connected to server at {self.server_url}"}
         else:
-            print("Not connected to server")
+            self.logger_http_client.info("Not connected to server")
             return {"status": "disconnected", "message": "Not connected to server"}
 
     def send_ping(self):
@@ -159,7 +217,7 @@ class RobotControlAPI:
     def send_message(self, message:str, endpoint:str):
         if self.connected:
             try:
-                print(f"Sending message: {message}")
+                self.logger_http_client.info(f"Sending message: {message}")
                 # Send the HTTP POST request to the server with the message
                 # Change this line in your Python client:
                 if endpoint == "aspirate" or endpoint == "dispense" or endpoint == "set_parameters":
@@ -169,14 +227,13 @@ class RobotControlAPI:
                 status_code = response.status_code
                 response = response.json()
                 if status_code == 200:
-                    print(response["message"],"\n")
+                    self.logger_http_client.info(response["message"])
                     return response
                 else:
-                    print(response["message"],"\n")
+                    self.logger_http_client.error(response["message"])
                     return response
             except requests.exceptions.RequestException as e:
-                self.check_server_availability()
-                if (not self.connected):
-                    print(f"Server has disconnected")
+                if (not self.check_server_availability()):
+                    self.logger_http_client.error("Server has disconnected")
                 else:
-                    print(f"Error sending message: {e}")
+                    self.logger_http_client.error(f"Error sending message: {e}")

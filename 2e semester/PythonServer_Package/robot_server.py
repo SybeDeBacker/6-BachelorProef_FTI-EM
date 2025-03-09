@@ -5,7 +5,7 @@ import colorlog
 import os
 
 class RobotServer:
-    def __init__(self, robot: RobotObject,log_files_path: str = "2e semester/PythonServer_Package/logs/"):
+    def __init__(self, robot: RobotObject,log_files_path: str = "C:/Users/Sybe/Documents/!UAntwerpen/6e Semester/6 - Bachelorproef/Code/Github/6-BachelorProef_FTI-EM_CoSysLab/2e semester/PythonServer_Package/logs"):
         self.app = Flask(__name__)
 
         # Set up logging
@@ -31,8 +31,8 @@ class RobotServer:
         self.app.add_url_rule('/eject_tip', 'eject_tip', self.handle_eject, methods=['GET'])
 
     def setup_logging(self,log_files_path:str):
-        log_file_path_server = f"{log_files_path}server.log"  # Relative path
-        log_file_path_common = f"{log_files_path}common_log.log"  # Relative path
+        log_file_path_server = os.path.abspath(f"{log_files_path}/server_log.log") # Relative path
+        log_file_path_common = os.path.abspath(f"{log_files_path}/common_log.log") # Relative path
         
         os.makedirs(os.path.dirname(log_file_path_server), exist_ok=True)
         os.makedirs(os.path.dirname(log_file_path_common), exist_ok=True)
@@ -69,7 +69,6 @@ class RobotServer:
         self.logger_server.addHandler(file_handler_common_server)
         self.logger_server.propagate = False
 
-        self.logger_server.warning("Operating on HTTP Control API")
         self.logger_server.info(f"Server logging initialized. Logs are saved at: {log_files_path}")
 
     def handle_aspirate_command(self):
@@ -134,11 +133,11 @@ class RobotServer:
             lead = command.get("pipet_lead")
             vtr = command.get("volume_to_travel_ratio")
             self.logger_server.info(f"Received set parameters command: microsteps={microsteps}, lead={lead}, vtr={vtr}")
-            return jsonify(self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)),500
+            return jsonify(self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)),200
         
         except Exception as e:
             if str(e) == "Serial not connected":
-                e = self.handle_serial_error()
+                e = e#self.handle_serial_error()
             else:
                 self.logger_server.error(f"Error processing aspirate command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing parameter set command: {e}"}), 500
@@ -166,13 +165,14 @@ class RobotServer:
 
     def handle_serial_error(self):
         error = "Serial not connected"
-        self.logger_server.critical(f"Error processing aspirate command: {error}")
+        self.logger_server.critical(f"Error processing command: {error}")
         width = len(str(error))+10
         errorstring = f"""\033[31m
 {"-"*width}
 {"Error opening serial port" : ^{width}}
 {str(error): ^{width}}
 {"-"*width}\033[0m"""
+        errorstring = "Error opening serial port"
         return errorstring
         
     def run(self, host, port):

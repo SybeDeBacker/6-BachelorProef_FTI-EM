@@ -125,6 +125,7 @@ String eject(){
 }
 
 bool moveStepper(int steps, float rpm) {
+  if (PRETEND_FALSE){return false;}
   if (!USE_STEPPER_MOTOR){return true;}
   stepper.setSpeed(rpm);
   stepper.move(steps);

@@ -3,6 +3,7 @@
 
 // Define boolean settings
 #define ENABLE_DEBUG false
+#define PRETEND_FALSE true
 #define USE_STEPPER_MOTOR false
 #define SAFETY_CHECKS_ENABLED false
 #define INVERT_DIRECTION false
