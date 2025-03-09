@@ -25,6 +25,7 @@ class RobotServer:
         self.app.add_url_rule('/aspirate', 'aspirate', self.handle_aspirate_command, methods=['POST'])
         self.app.add_url_rule('/dispense', 'dispense', self.handle_dispense_command, methods=['POST'])
         self.app.add_url_rule('/set_parameters', 'set_parameters', self.handle_set_parameters, methods=['POST'])
+        self.app.add_url_rule('/set_safe_bounds', 'set_safe_bounds', self.handle_set_safe_bounds, methods=['POST'])
         self.app.add_url_rule('/ping', 'ping', self.handle_ping, methods=['GET'])
         self.app.add_url_rule('/request', 'request', self.handle_request, methods=['GET'])
         self.app.add_url_rule('/zero_robot', 'zero_robot', self.zero_robot, methods=['GET'])
@@ -85,12 +86,7 @@ class RobotServer:
             self.robot.aspirate_pipette(volume=volume, rate=rate)
             return jsonify({"status": "Success", "message": f"Aspirated {volume} ul at a rate of {rate} ul/s"})
         except Exception as e:
-            if str(e) == "Serial not connected":
-                e = self.handle_serial_error()
-            else:
-                self.logger_server.error(f"Error processing aspirate command: {e}")
-            
-            return jsonify({"status": "Error", "message": f"Error processing aspirate command: {e}"}), 500
+            return self.exception_handler(str(e))
 
     def handle_dispense_command(self):
         try:
@@ -107,11 +103,7 @@ class RobotServer:
             return jsonify({"status": "Success", "message": f"Dispensed {volume} ul at a rate of {rate} ul/s"})
         
         except Exception as e:
-            if str(e) == "Serial not connected":
-                e = self.handle_serial_error()
-            else:
-                self.logger_server.error(f"Error processing aspirate command: {e}")
-            return jsonify({"status": "Error", "message": f"Error processing dispense command: {e}"}), 500
+            return self.exception_handler(str(e))
 
     def handle_ping(self):
         self.logger_server.info("Received ping request")
@@ -119,12 +111,11 @@ class RobotServer:
 
     def handle_request(self):
         try:
-            current_pos = self.robot.get_current_volume()
-            self.logger_server.info(f"Received volume request: Current volume: {current_pos} ul")
-            return jsonify({"status": "Success", "message": f"Current volume: {current_pos} ul"})
+            self.logger_server.info(f"Received volume request")
+            current_volume = self.robot.get_current_volume()
+            return jsonify({"status": "Success", "message": f"Current volume: {current_volume} ul"})
         except Exception as e:
-            self.logger_server.error(f"Error processing request: {e}")
-            return jsonify({"status": "Error", "message": f"Error processing request: {e}"}), 500
+            return self.exception_handler(str(e))
 
     def handle_set_parameters(self):
         try:
@@ -136,11 +127,18 @@ class RobotServer:
             return jsonify(self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)),200
         
         except Exception as e:
-            if str(e) == "Serial not connected":
-                e = e#self.handle_serial_error()
-            else:
-                self.logger_server.error(f"Error processing aspirate command: {e}")
-            return jsonify({"status": "Error", "message": f"Error processing parameter set command: {e}"}), 500
+            return self.exception_handler(str(e))
+
+    def handle_set_safe_bounds(self):
+        try:
+            command = request.get_json()
+            lower = command.get("lower")
+            upper = command.get("upper")
+            self.logger_server.info(f"Received set safe bounds command: [{upper},{lower}]")
+            return jsonify(self.robot.set_safe_bounds([lower,upper])),200
+        
+        except Exception as e:
+            return self.exception_handler(str(e))
 
     def handle_eject(self):
         try:
@@ -148,11 +146,7 @@ class RobotServer:
             self.robot.eject_tip()
             return jsonify({"status": "Success", "message": "Tip ejected"})
         except Exception as e:
-            if str(e) == "Serial not connected":
-                e = self.handle_serial_error()
-            else:
-                self.logger_server.error(f"Error processing aspirate command: {e}")
-            return jsonify({"status": "Error", "message": f"Error processing eject_tip command: {e}"}), 500
+            return self.exception_handler(str(e))
 
     def zero_robot(self):
         try:
@@ -164,17 +158,25 @@ class RobotServer:
             return jsonify({"status": "Error", "message": f"Error processing zero_robot command: {e}"}), 500
 
     def handle_serial_error(self):
-        error = "Serial not connected"
-        self.logger_server.critical(f"Error processing command: {error}")
+        return "Error opening serial port"
+        error = "Error opening serial port"
         width = len(str(error))+10
         errorstring = f"""\033[31m
 {"-"*width}
 {"Error opening serial port" : ^{width}}
 {str(error): ^{width}}
 {"-"*width}\033[0m"""
-        errorstring = "Error opening serial port"
         return errorstring
-        
+
+    def exception_handler(self,e:str)->tuple:
+        if str(e) == "Error opening serial port":
+            e = self.handle_serial_error()
+            self.logger_server.critical(f"Error processing command: {e}")
+            return jsonify({"status": "Error", "message": f"Error processing command: {e}"}), 504
+        else:
+            self.logger_server.error(f"Error processing aspirate command: {e}")
+        return jsonify({"status": "Error", "message": f"Error processing command: {e}"}), 500
+
     def run(self, host, port):
         from waitress import serve
         self.logger_server.info(f"Server running on http://{host}:{port}")

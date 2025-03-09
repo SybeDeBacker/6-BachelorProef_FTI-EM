@@ -65,6 +65,9 @@ class RobotControlAPI:
             self.robot.aspirate_pipette(volume=volume_in_ul, rate=rate_in_ul_per_s)
             return{"status": "success", "message": f"Aspirate command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
         except Exception as e:
+            if str(e) == "Position out of safe bounds":
+                self.logger_local.warning(f"Error sending aspirate command: {e}")
+                return{"status": "error", "message": f"Error sending aspirate command: {e}"}
             self.logger_local.error(f"Error sending aspirate command: {e}")
             return{"status": "error", "message": f"Error sending aspirate command: {e}"}
 
@@ -74,8 +77,11 @@ class RobotControlAPI:
             self.robot.dispense_pipette(volume=volume_in_ul, rate=rate_in_ul_per_s)
             return{"status": "success", "message": f"Dispense command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
         except Exception as e:
-            self.logger_local.error(f"Error sending dispense command: {e}")
-            return{"status": "error", "message": f"Error sending dispense command: {e}"}
+            if str(e) == "Position out of safe bounds":
+                self.logger_local.warning(f"Error sending aspirate command: {e}")
+                return{"status": "error", "message": f"Error sending aspirate command: {e}"}
+            self.logger_local.error(f"Error sending aspirate command: {e}")
+            return{"status": "error", "message": f"Error sending aspirate command: {e}"}
 
     def eject_tip(self):
         try:
@@ -123,6 +129,15 @@ class RobotControlAPI:
             self.logger_local.error(f"Error setting Lead: {e}")
             return {"status":"error","message":f"Error setting Lead: {e}"}
     
+    def set_safe_bounds(self,bounds: list[int]):
+        try:
+            bounds = sorted(bounds)
+            self.robot.set_safe_bounds(bounds)
+            return{"status": "success", "message": f"Set bounds command sent: {bounds}"}
+        except Exception as e:
+            self.logger_local.error(f"Error setting safe bounds: {e}")
+            return {"status":"error","message":f"Error setting safe bounds: {e}"}
+ 
     def set_volume_to_travel_ratio(self, ratio_in_ul_per_mm: int):
         try:
             self.logger_local.info(f"Setting parameter: Volume to travel ratio = {ratio_in_ul_per_mm}ul/mm")

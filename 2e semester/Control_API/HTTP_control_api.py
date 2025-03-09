@@ -214,13 +214,29 @@ class RobotControlAPI:
                 self.connected = False
                 break
 
+    def set_safe_bounds(self,bounds: list[int]):
+        if not self.connected:
+            self.logger_http_client.error("Bounds command not sent: Not connected to server")
+            return{"status": "error", "message": "Not connected to server"}
+
+        bounds = sorted(bounds)
+        command = {
+            "lower": bounds[0],
+            "upper": bounds[1]
+        }
+
+        command_str = json.dumps(command)
+        self.send_message(command_str, "set_safe_bounds")
+        return{"status": "success", "message": f"Set bounds command sent: {bounds}"}
+        
     def send_message(self, message:str, endpoint:str):
         if self.connected:
             try:
                 self.logger_http_client.info(f"Sending message: {message}")
                 # Send the HTTP POST request to the server with the message
                 # Change this line in your Python client:
-                if endpoint == "aspirate" or endpoint == "dispense" or endpoint == "set_parameters":
+                post_endpoints = ["aspirate","dispense","set_parameters","set_safe_bounds"]
+                if endpoint in post_endpoints:
                     response = requests.post(f"{self.server_url}/{endpoint}", json=json.loads(message))
                 else:
                     response = requests.get(f"{self.server_url}/{endpoint}")
@@ -228,6 +244,9 @@ class RobotControlAPI:
                 response = response.json()
                 if status_code == 200:
                     self.logger_http_client.info(response["message"])
+                    return response
+                elif status_code == 504:
+                    self.logger_http_client.critical(response["message"])
                     return response
                 else:
                     self.logger_http_client.error(response["message"])

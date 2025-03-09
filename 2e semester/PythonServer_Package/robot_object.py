@@ -11,13 +11,13 @@ class RobotObject:
         self.serial_port = serial_port
         self.baud_rate = baud_rate
 
-        self.current_volume = 0
-        self.safe_bounds = [0, 1000]
+        self.current_volume = 0 #ul
+        self.safe_bounds = [0, 1000] #ul
         self.stepper_pipet_microsteps = 16
-        self.pipet_lead = 1
-        self.volume_to_travel_ratio = 100
-        self.timeout = timeout
-
+        self.pipet_lead = 1 #mm/rev
+        self.volume_to_travel_ratio = 100 #ul/mm
+        self.timeout = timeout #s
+        
         self.serial_connected = False
 
     def setup_logging(self, log_files_path: str)-> None:
@@ -81,7 +81,7 @@ class RobotObject:
 {"Error opening serial port" : ^{width}}
 {str(e): ^{width}}
 {"-"*width}\033[0m""")
-            raise Exception("Serial not connected")
+            raise Exception("Error opening serial port")
 
         self.ser.flush()  
         if False:
@@ -89,7 +89,6 @@ class RobotObject:
                 self.receive_response(print_confirmation=False, startup = False)
         
         response = self.send_command("Ping",print_confirmation=False)
-
         if len(response)>0:
             self.serial_connected = True
             self.logger_robot.info("Serial responding")
@@ -99,7 +98,10 @@ class RobotObject:
             self.logger_robot.error("Serial not responding")
             raise Exception("Serial not responding")
         
-        self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
+        try:
+            self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=True)
+        except:
+            pass
 
     def send_command(self, command: str, print_confirmation: bool = True) -> dict:
         try:
@@ -110,9 +112,9 @@ class RobotObject:
                 self.ser.flush()
             except Exception as e:
                 self.ser.close()
-                self.logger_robot.error(f"Error flushing serial port: {e}")
+                self.logger_robot.critical(f"Error flushing serial port: {e}")
                 self.serial_connected = False
-                raise Exception("Serial not connected")
+                raise Exception("Error opening serial port")
 
         if print_confirmation:
             self.logger_robot.info(f"Sent command over Serial: {command}")
@@ -120,9 +122,9 @@ class RobotObject:
         try:
             self.ser.write(command.encode('utf-8'))
         except Exception as e:
-            self.logger_robot.error(f"Error writing to serial port: {e}")
+            self.logger_robot.critical(f"Error writing to serial port: {e}")
             self.serial_connected = False
-            raise Exception("Serial not connected")
+            raise Exception("Error opening serial port")
 
         return self.receive_response(print_confirmation=print_confirmation)
 
@@ -130,7 +132,7 @@ class RobotObject:
         if not self.serial_connected:
             self.serial_connected = self.send_command("Ping")["status"] == "success"
             if not self.serial_connected:
-                raise Exception("Serial not connected")
+                raise Exception("Error opening serial port")
             
         if not self.is_action_safe(volume if action == 'aspirate' else -volume):
             self.logger_robot.warning(f"Action unsafe: Volume {self.current_volume + volume} is out of bounds!")
@@ -186,7 +188,7 @@ class RobotObject:
         return {"status": "success", "message": f"Parameters set: Microsteps: {self.stepper_pipet_microsteps}, Lead: {self.pipet_lead}, VolumeToTravel ratio: {self.volume_to_travel_ratio}"}
 
     def get_current_volume(self):
-        self.logger_robot.info(f"Received volume request. Current volume = {self.current_volume}")
+        self.logger_robot.info(f"Received volume request: Current volume: {self.current_volume} ul")
         return self.current_volume
 
     def is_action_safe(self, volume: int):
@@ -202,23 +204,24 @@ class RobotObject:
     def sanitize_json(self, json_string: str) -> str:
         json_string = json_string.strip()
         if json_string.find("Serial started")!=-1:
-            return '{"status":"successs"}'
+            return '{"status":"success"}'
         if not json_string.startswith("{") or not json_string.endswith("}"):
-            self.logger_robot.warning(f"Invalid JSON received: {json_string}")
-            return "{}"  # Return empty JSON instead of crashing
+            return ""
         return json_string
 
     def receive_response(self, print_confirmation: bool = True, startup: bool = False) -> dict:
         try:
             start_time = time()
             while True:
-                if time() - start_time > self.timeout:
-                    raise TimeoutError("No response from Arduino")
                 while not self.ser.in_waiting:
-                    pass
+                    if time() - start_time > self.timeout:
+                        raise TimeoutError(f"No response from Arduino after timeout of {self.timeout}s")
                 while self.ser.in_waiting:
                     # Receive data from the Arduino
-                    receive_string = self.ser.readline()
+                    try:
+                        receive_string = self.ser.readline()
+                    except:
+                        raise Exception("Serial not available")
                     try:
                         received:str = receive_string.decode('utf-8', 'ignore').rstrip()
                     except:
@@ -230,23 +233,32 @@ class RobotObject:
                         return dictify("status:success")
                 try:
                     sanitized_string = self.sanitize_json(received)
-                    response = dictify(sanitized_string)
-                    if not sanitized_string.startswith("{") or not sanitized_string.endswith("}"):
-                        self.logger_robot.warning(f"Invalid JSON received: {sanitized_string}")
+                    if sanitized_string == "":
+                        self.logger_robot.warning(f"Invalid JSON received: {received}")
                         raise Exception("Invalid JSON response from Arduino")
-                    if response["status"]=="error":
-                        self.logger_robot.warning("Error in answer")
-                        raise Exception(response["message"])
-                    else:
-                        return response
+                    response = dictify(sanitized_string)
+                    try:
+                        if dict(response)["status"]=="error":
+                            if "message" in response.keys():
+                                raise Exception(f"Robot could not execute command: {response["message"]}")
+                            else:
+                                raise Exception("Robot could not execute command")
+                        else:
+                            return response
+                    except Exception as e:
+                        raise e
                 except Exception as e:
-                    print(e)
-                    self.logger_robot.info("Received over Serial: "+received)
-                    self.logger_robot.error(f"JSON decode error: {e}")
+                    if e.__class__ == JSONDecodeError:
+                        self.logger_robot.error(f"JSON decode error: {e}")
                     raise Exception(e)
         except Exception as e:
             self.logger_robot.error(f"Exception in receive_response: {e}")
             raise Exception(e)
 
     def set_safe_bounds(self, safe_bounds: list[int]):
-        self.safe_bounds = safe_bounds
+        try:
+            self.logger_robot.info(f"Received set safe bounds command: {safe_bounds}")
+            self.safe_bounds = safe_bounds
+            return {"status":"success","message":f"Safe bounds set succesfully: {self.safe_bounds}"}
+        except Exception as e:
+            raise e
