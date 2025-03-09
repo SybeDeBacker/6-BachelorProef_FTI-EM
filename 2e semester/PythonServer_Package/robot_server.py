@@ -5,15 +5,21 @@ import colorlog
 import os
 
 class RobotServer:
-    def __init__(self, robot: RobotObject):
-        self.robot = robot
+    def __init__(self, robot: RobotObject,log_files_path: str = "2e semester/PythonServer_Package/logs/"):
         self.app = Flask(__name__)
 
         # Set up logging
-        self.setup_logging()
+        self.setup_logging(log_files_path)
 
-        self.app.logger.handlers = self.logger_server.handlers
-        self.app.logger.setLevel(self.logger_server.level)
+        try:
+            self.robot = robot
+            robot.setup_logging(log_files_path)
+            self.robot.connect_serial()
+        except Exception as e:
+            self.logger_server.critical(f"Error initializing robot: {e}")
+            pause = input("Press Enter to continue...")
+            self.logger_server.warning("Exiting server")
+            exit(0)
 
         # Define routes
         self.app.add_url_rule('/aspirate', 'aspirate', self.handle_aspirate_command, methods=['POST'])
@@ -24,9 +30,9 @@ class RobotServer:
         self.app.add_url_rule('/zero_robot', 'zero_robot', self.zero_robot, methods=['GET'])
         self.app.add_url_rule('/eject_tip', 'eject_tip', self.handle_eject, methods=['GET'])
 
-    def setup_logging(self):
-        log_file_path_server = "2e semester/PythonServer_Package/logs/server.log"  # Relative path
-        log_file_path_common = "2e semester/PythonServer_Package/logs/common_log.log"  # Relative path
+    def setup_logging(self,log_files_path:str):
+        log_file_path_server = f"{log_files_path}server.log"  # Relative path
+        log_file_path_common = f"{log_files_path}common_log.log"  # Relative path
         
         os.makedirs(os.path.dirname(log_file_path_server), exist_ok=True)
         os.makedirs(os.path.dirname(log_file_path_common), exist_ok=True)
@@ -63,7 +69,8 @@ class RobotServer:
         self.logger_server.addHandler(file_handler_common_server)
         self.logger_server.propagate = False
 
-        self.logger_server.info(f"Server logging initialized. Logs are saved at: {log_file_path_server} and {log_file_path_common}")
+        self.logger_server.warning("Operating on HTTP Control API")
+        self.logger_server.info(f"Server logging initialized. Logs are saved at: {log_files_path}")
 
     def handle_aspirate_command(self):
         try:

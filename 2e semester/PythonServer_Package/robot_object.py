@@ -7,51 +7,22 @@ from time import time
 import os
 
 class RobotObject:
-    def __init__(self):
-        self.setup_logging()
-        
-        # Open serial port
-        try:
-            self.ser = serial.Serial('COM3', 9600, timeout=1)
-        except Exception as e:
-            self.logger_robot.critical(f"Error opening serial port: {e}")
-            width = len(str(e)) + 10
-            print(f"""\033[31m
-{"-"*width}
-{"Error opening serial port" : ^{width}}
-{str(e): ^{width}}
-{"-"*width}\033[0m""")
-            raise Exception("Serial not connected")
-        
+    def __init__(self, serial_port: str = 'COM3', baud_rate: int = 9600, timeout: int = 5) -> None:        
+        self.serial_port = serial_port
+        self.baud_rate = baud_rate
+
         self.current_volume = 0
         self.safe_bounds = [0, 1000]
         self.stepper_pipet_microsteps = 16
         self.pipet_lead = 1
         self.volume_to_travel_ratio = 100
-        self.timeout = 5
+        self.timeout = timeout
 
-        self.serial_connected = True
+        self.serial_connected = False
 
-
-        self.ser.flush()  
-        if self.ser.in_waiting:    
-            self.receive_response(print_confirmation=False)
-        response = self.send_command("Ping")
-
-        if len(response)>0:
-            self.serial_connected = True
-            self.logger_robot.info("Serial responding")
-        else:
-            self.serial_connected = False
-            self.ser.close()
-            self.logger_robot.error("Serial not responding")
-            raise Exception("Serial not responding")
-        
-        self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
-
-    def setup_logging(self):
-        log_file_path_object = "2e semester/PythonServer_Package/logs/object.log"  # Relative path
-        log_file_path_common = "2e semester/PythonServer_Package/logs/common_log.log"  # Relative path
+    def setup_logging(self, log_files_path: str)-> None:
+        log_file_path_object = f"{log_files_path}object.log"  # Relative path
+        log_file_path_common = f"{log_files_path}common_log.log"  # Relative path
 
         # Ensure the logs directory exists
         os.makedirs(os.path.dirname(log_file_path_object), exist_ok=True)
@@ -92,6 +63,41 @@ class RobotObject:
         self.logger_robot.propagate = False
         self.logger_robot.info("Robot logging set up")
 
+    def connect_serial(self, serial_port: str = "", baud_rate:int = 0) -> None:
+        # Open serial port
+        if serial_port == "":
+            serial_port = self.serial_port
+        if baud_rate == 0:
+            baud_rate = self.baud_rate
+        
+        try:
+            self.ser = serial.Serial(serial_port, baud_rate, timeout=1)
+        except Exception as e:
+            self.logger_robot.critical(f"Error opening serial port: {e}")
+            width = len(str(e)) + 10
+            print(f"""\033[31m
+{"-"*width}
+{"Error opening serial port" : ^{width}}
+{str(e): ^{width}}
+{"-"*width}\033[0m""")
+            raise Exception("Serial not connected")
+
+        self.ser.flush()  
+        if self.ser.in_waiting:    
+            self.receive_response(print_confirmation=False)
+        response = self.send_command("Ping")
+
+        if len(response)>0:
+            self.serial_connected = True
+            self.logger_robot.info("Serial responding")
+        else:
+            self.serial_connected = False
+            self.ser.close()
+            self.logger_robot.error("Serial not responding")
+            raise Exception("Serial not responding")
+        
+        self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=False)
+
     def send_command(self, command: str, print_confirmation: bool = False) -> dict:
         try:
             self.ser.flush()
@@ -118,7 +124,7 @@ class RobotObject:
 
         return self.receive_response(print_confirmation=print_confirmation)
 
-    def pipette_action(self, action: str, volume: int, rate: int, print_confirmation: bool = True):
+    def pipette_action(self, action: str, volume: int, rate: int, print_confirmation: bool = True)-> None:
         if not self.serial_connected:
             self.serial_connected = self.send_command("Ping")["status"] == "success"
             if not self.serial_connected:
@@ -144,13 +150,13 @@ class RobotObject:
         if print_confirmation:
             self.logger_robot.info(f"{action.capitalize()}d by {volume} ul. Current volume: {self.current_volume} ul")
 
-    def aspirate_pipette(self, volume: int, rate: int, print_confirmation: bool = True):
+    def aspirate_pipette(self, volume: int, rate: int, print_confirmation: bool = True)-> None:
         self.pipette_action('aspirate', volume, rate, print_confirmation)
 
-    def dispense_pipette(self, volume: int, rate: int, print_confirmation: bool = True):
+    def dispense_pipette(self, volume: int, rate: int, print_confirmation: bool = True)-> None:
         self.pipette_action('dispense', volume, rate, print_confirmation)
 
-    def eject_tip(self, print_confirmation: bool = True):
+    def eject_tip(self, print_confirmation: bool = True)-> None:
         eject_tip_command = "E"
         self.send_command(eject_tip_command, print_confirmation=print_confirmation)
 
