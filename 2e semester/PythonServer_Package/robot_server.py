@@ -78,13 +78,10 @@ class RobotServer:
             volume = command.get("volume")
             rate = command.get("rate")
             self.logger_server.info(f"Received aspirate command: volume={volume}, rate={rate}")
-
-            if not self.robot.is_action_safe(volume):
-                self.logger_server.warning("Aspirate command out of safe bounds")
-                return jsonify({"status": "Error", "message": "Error processing aspirate command: Position out of safe bounds"}), 400
-
-            self.robot.aspirate_pipette(volume=volume, rate=rate)
-            return jsonify({"status": "Success", "message": f"Aspirated {volume} ul at a rate of {rate} ul/s"})
+            response = self.robot.aspirate_pipette(volume=volume, rate=rate)
+            self.logger_server.info(f"{response["message"]}")
+            return jsonify({"status": "Success", "message": response["message"]}),200
+        
         except Exception as e:
             return self.exception_handler(str(e))
 
@@ -94,13 +91,9 @@ class RobotServer:
             volume = command.get("volume")
             rate = command.get("rate")
             self.logger_server.info(f"Received dispense command: volume={volume}, rate={rate}")
-
-            if not self.robot.is_action_safe(-volume):
-                self.logger_server.warning("Dispense command out of safe bounds")
-                return jsonify({"status": "Error", "message": "Error processing dispense command: Position out of safe bounds"}), 400
-
-            self.robot.dispense_pipette(volume=volume, rate=rate)
-            return jsonify({"status": "Success", "message": f"Dispensed {volume} ul at a rate of {rate} ul/s"})
+            response = self.robot.dispense_pipette(volume=volume, rate=rate)
+            self.logger_server.info(f"{response["message"]}")
+            return jsonify({"status": "Success", "message": f"{response["message"]}"})
         
         except Exception as e:
             return self.exception_handler(str(e))
@@ -113,7 +106,7 @@ class RobotServer:
         try:
             self.logger_server.info(f"Received volume request")
             current_volume = self.robot.get_current_volume()
-            return jsonify({"status": "Success", "message": f"Current volume: {current_volume} ul"})
+            return jsonify({"status": "Success", "message": f"Current volume: {current_volume} ul"}),200
         except Exception as e:
             return self.exception_handler(str(e))
 
@@ -144,7 +137,7 @@ class RobotServer:
         try:
             self.logger_server.info("Received eject tip command")
             self.robot.eject_tip()
-            return jsonify({"status": "Success", "message": "Tip ejected"})
+            return jsonify({"status": "Success", "message": "Tip ejected"}),200
         except Exception as e:
             return self.exception_handler(str(e))
 
@@ -152,7 +145,7 @@ class RobotServer:
         try:
             self.logger_server.info("Received zero robot command")
             self.robot.zero_robot()
-            return jsonify({"status": "Success", "message": "Robot homed. Current volume: 0"})
+            return jsonify({"status": "Success", "message": "Robot homed. Current volume: 0"}),200
         except Exception as e:
             self.logger_server.error(f"Error processing zero_robot command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing zero_robot command: {e}"}), 500
@@ -169,12 +162,15 @@ class RobotServer:
         return errorstring
 
     def exception_handler(self,e:str)->tuple:
+        if str(e) == "Position out of safe bounds":
+            self.logger_server.warning("Aspirate command out of safe bounds")
+            return jsonify({"status": "Error", "message": "Error processing aspirate command: Position out of safe bounds"}), 400
         if str(e) == "Error opening serial port":
             e = self.handle_serial_error()
             self.logger_server.critical(f"Error processing command: {e}")
             return jsonify({"status": "Error", "message": f"Error processing command: {e}"}), 504
         else:
-            self.logger_server.error(f"Error processing aspirate command: {e}")
+            self.logger_server.error(f"Error processing aspirate: {e}")
         return jsonify({"status": "Error", "message": f"Error processing command: {e}"}), 500
 
     def run(self, host, port):

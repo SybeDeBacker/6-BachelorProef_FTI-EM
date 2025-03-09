@@ -99,6 +99,7 @@ class RobotControlAPI:
 
     def aspirate(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
+        self.logger_http_client.info(f"Sending aspirate command: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s")
         if not self.connected:
             self.logger_http_client.error("Move command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
@@ -114,8 +115,9 @@ class RobotControlAPI:
 
     def dispense(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
+        self.logger_http_client.info(f"Sending dispense command: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s")
         if not self.connected:
-            self.logger_http_client.error("Move command not sent: Not connected to server")
+            self.logger_http_client.error("Dispense command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         command = {
@@ -129,19 +131,22 @@ class RobotControlAPI:
 
     def eject_tip(self):
         """Sends an eject tip command."""
+        self.logger_http_client.info("Ejecting tip")
         if not self.connected:
-            self.logger_http_client.error("Move command not sent: Not connected to server")
+            self.logger_http_client.error("Eject command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
 
         self.send_message(json.dumps({"type": "eject_tip"}),"eject_tip")
         return{"status": "success", "message": "Eject tip command sent"}
 
     def zero_robot(self):
+        self.logger_http_client.info("Zeroing robot volume")
         self.send_message(json.dumps({"type": "zero_robot"}),"zero_robot")
         return{"status": "success", "message": "Zero command sent"}
 
     def request_position(self):
         """Requests the robot's current position."""
+        self.logger_http_client.info("Sending volume request")
         if not self.connected:
             self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
@@ -169,7 +174,7 @@ class RobotControlAPI:
             self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
-        self.logger_http_client.info(f"Changing lead to {lead_in_mm_per_rotation}")
+        self.logger_http_client.info(f"Changing lead to {lead_in_mm_per_rotation}mm/rev")
 
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": 0,
@@ -184,7 +189,7 @@ class RobotControlAPI:
             self.logger_http_client.error("Request failed: Not connected to server")
             return {"status": "error", "message": "Not connected to server"}
         
-        self.logger_http_client.info(f"Changing ratio to {ratio_in_ul_per_mm}")
+        self.logger_http_client.info(f"Changing volume to travel ratio to {ratio_in_ul_per_mm}ul/mm")
 
         self.send_message(json.dumps({
             "stepper_pipet_microsteps": 0,
@@ -196,7 +201,7 @@ class RobotControlAPI:
 
     def get_status(self):
         """Checks and returns the current connection status."""
-        self.logger_http_client.info("Status request received")
+        self.logger_http_client.info("Sending status request")
         if self.connected:
             self.logger_http_client.info(f"Connected to server at: {self.server_url}")
             return {"status": "connected", "message": f"Connected to server at {self.server_url}"}
@@ -215,6 +220,7 @@ class RobotControlAPI:
                 break
 
     def set_safe_bounds(self,bounds: list[int]):
+        self.logger_http_client.info(f"Setting bounds to {bounds}")
         if not self.connected:
             self.logger_http_client.error("Bounds command not sent: Not connected to server")
             return{"status": "error", "message": "Not connected to server"}
@@ -244,6 +250,9 @@ class RobotControlAPI:
                 response = response.json()
                 if status_code == 200:
                     self.logger_http_client.info(response["message"])
+                    return response
+                elif status_code == 400:
+                    self.logger_http_client.warning(response["message"])
                     return response
                 elif status_code == 504:
                     self.logger_http_client.critical(response["message"])

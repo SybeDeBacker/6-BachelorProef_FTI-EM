@@ -128,7 +128,7 @@ class RobotObject:
 
         return self.receive_response(print_confirmation=print_confirmation)
 
-    def pipette_action(self, action: str, volume: int, rate: int, print_confirmation: bool = True)-> None:
+    def pipette_action(self, action: str, volume: int, rate: int, print_confirmation: bool = True)-> dict[str,str]:
         if not self.serial_connected:
             self.serial_connected = self.send_command("Ping")["status"] == "success"
             if not self.serial_connected:
@@ -152,17 +152,19 @@ class RobotObject:
         self.current_volume += volume if action == 'aspirate' else -volume
 
         if print_confirmation:
-            self.logger_robot.info(f"{action.capitalize()}d by {volume} ul. Current volume: {self.current_volume} ul")
+            self.logger_robot.info(f"{action.capitalize()}d {volume} ul at a rate of {rate} ul/s. Current volume: {self.current_volume}ul")
+        return {"status":"success","message":f"{action.capitalize()}d {volume} ul at a rate of {rate} ul/s. Current volume: {self.current_volume}ul"}
 
-    def aspirate_pipette(self, volume: int, rate: int, print_confirmation: bool = True)-> None:
-        self.pipette_action('aspirate', volume, rate, print_confirmation)
+    def aspirate_pipette(self, volume: int, rate: int, print_confirmation: bool = True)-> dict[str,str]:
+        return self.pipette_action('aspirate', volume, rate, print_confirmation)
 
-    def dispense_pipette(self, volume: int, rate: int, print_confirmation: bool = True)-> None:
-        self.pipette_action('dispense', volume, rate, print_confirmation)
+    def dispense_pipette(self, volume: int, rate: int, print_confirmation: bool = True)-> dict[str,str]:
+        return self.pipette_action('dispense', volume, rate, print_confirmation)
 
-    def eject_tip(self, print_confirmation: bool = True)-> None:
+    def eject_tip(self, print_confirmation: bool = True)-> dict[str,str]:
         eject_tip_command = "E"
         self.send_command(eject_tip_command, print_confirmation=print_confirmation)
+        return {"status":"success"}
 
     def set_parameters(self, stepper_pipet_microsteps: int = 0, pipet_lead: int = 0, volume_to_travel_ratio: int = 0, print_confirmation: bool = True) -> dict:
         if stepper_pipet_microsteps == 0 and pipet_lead == 0 and volume_to_travel_ratio == 0:
@@ -192,6 +194,7 @@ class RobotObject:
         return self.current_volume
 
     def is_action_safe(self, volume: int):
+        self.logger_robot.info(f"Received safety request for v = {volume}ul with bounds = {self.safe_bounds} and current volume = {self.current_volume} ul")
         return self.safe_bounds[0] <= self.current_volume + volume <= self.safe_bounds[1]
 
     def zero_robot(self, print_confirmation: bool = True):

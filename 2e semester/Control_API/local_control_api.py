@@ -62,34 +62,44 @@ class RobotControlAPI:
         """Sends an aspirate command."""
         try:
             self.logger_local.info(f"Sent aspirate command: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s")
-            self.robot.aspirate_pipette(volume=volume_in_ul, rate=rate_in_ul_per_s)
-            return{"status": "success", "message": f"Aspirate command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
+            response = self.robot.aspirate_pipette(volume=volume_in_ul, rate=rate_in_ul_per_s)
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
         except Exception as e:
             if str(e) == "Position out of safe bounds":
                 self.logger_local.warning(f"Error sending aspirate command: {e}")
-                return{"status": "error", "message": f"Error sending aspirate command: {e}"}
-            self.logger_local.error(f"Error sending aspirate command: {e}")
+            elif str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error sending aspirate command: {e}")
+            else:
+                self.logger_local.error(f"Error sending aspirate command: {e}")
             return{"status": "error", "message": f"Error sending aspirate command: {e}"}
 
     def dispense(self, volume_in_ul: int, rate_in_ul_per_s:int): 
         try:
             self.logger_local.info(f"Sent dispense command: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s")
-            self.robot.dispense_pipette(volume=volume_in_ul, rate=rate_in_ul_per_s)
-            return{"status": "success", "message": f"Dispense command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
+            response = self.robot.dispense_pipette(volume=volume_in_ul, rate=rate_in_ul_per_s)
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
         except Exception as e:
             if str(e) == "Position out of safe bounds":
-                self.logger_local.warning(f"Error sending aspirate command: {e}")
-                return{"status": "error", "message": f"Error sending aspirate command: {e}"}
-            self.logger_local.error(f"Error sending aspirate command: {e}")
-            return{"status": "error", "message": f"Error sending aspirate command: {e}"}
+                self.logger_local.warning(f"Error sending dispense command: {e}")
+            elif str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error sending dispense command: {e}")
+            else:
+                self.logger_local.error(f"Error sending dispense command: {e}")
+            return{"status": "error", "message": f"Error sending dispense command: {e}"}
 
     def eject_tip(self):
         try:
             self.logger_local.info("Sent eject command")
-            self.robot.eject_tip()
-            return{"status": "success", "message": f"Eject tip command sent"}
+            response = self.robot.eject_tip()
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
         except Exception as e:
-            self.logger_local.error(f"Error sending eject tip command: {e}")
+            if str(e)=="Error opening serial port":
+                self.logger_local.critical(f"Error sending eject tip command: {e}")
+            else:
+                self.logger_local.error(f"Error sending eject tip command: {e}")
             return{"status": "error", "message": f"Error sending eject tip command: {e}"}
 
     def zero_robot(self):
@@ -98,51 +108,73 @@ class RobotControlAPI:
             self.robot.zero_robot()
             return{"status": "success", "message": f"Zero command sent"}
         except Exception as e:
-            self.logger_local.error(f"Error sending zero command: {e}")
+            if str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error sending zero command: {e}")
+            else:
+                self.logger_local.error(f"Error sending zero command: {e}")
             return{"status": "error", "message": f"Error sending zero command: {e}"}
 
     def request_position(self):
         try: 
             self.logger_local.info(f"Sent volume request")
             v = self.robot.get_current_volume()
-            self.logger_local.info(f"Current volume = {v}")
-            return{"status": "success", "message": f"Volume request sent: current volume = {v}ul"}
+            self.logger_local.info(f"Current volume = {v}ul")
+            return{"status": "success", "message": f"Current volume = {v}ul"}
         except Exception as e:
-            self.logger_local.error(f"Error sending volume request: {e}")
+            if str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error sending volume request: {e}")
+            else:
+                self.logger_local.error(f"Error sending volume request: {e}")
             return{"status": "error", "message": f"Error sending volume request: {e}"}
 
     def set_microstep_size(self, microstep: int):
         try:
             self.logger_local.info(f"Setting parameter: Microstep size = {microstep}")
-            self.robot.set_parameters(stepper_pipet_microsteps=microstep)
-            return {"status":"success","message":f"Parameter set: Microstep size = {microstep}"}
+            response = self.robot.set_parameters(stepper_pipet_microsteps=microstep)
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
         except Exception as e:
-            self.logger_local.error(f"Error setting microstep size: {e}")
+            if str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error setting microstep size: {e}")
+            else:
+                self.logger_local.error(f"Error setting microstep size: {e}")
             return {"status":"error","message":f"Error setting microstep size: {e}"}
     
     def set_lead(self, lead_in_mm_per_rotation: int):
         try:
             self.logger_local.info(f"Setting parameter: Lead = {lead_in_mm_per_rotation}mm/rev")
-            self.robot.set_parameters(pipet_lead=lead_in_mm_per_rotation)
-            return {"status":"success","message":f"Parameter set: Lead = {lead_in_mm_per_rotation}mm/rev"}
+            response = self.robot.set_parameters(pipet_lead=lead_in_mm_per_rotation)
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
         except Exception as e:
-            self.logger_local.error(f"Error setting Lead: {e}")
+            if str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error setting Lead: {e}")
+            else:
+                self.logger_local.error(f"Error setting Lead: {e}")
             return {"status":"error","message":f"Error setting Lead: {e}"}
     
     def set_safe_bounds(self,bounds: list[int]):
+        self.logger_local.info(f"Setting safe bounds to {bounds}")
         try:
             bounds = sorted(bounds)
-            self.robot.set_safe_bounds(bounds)
-            return{"status": "success", "message": f"Set bounds command sent: {bounds}"}
+            response = self.robot.set_safe_bounds(bounds)
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
         except Exception as e:
-            self.logger_local.error(f"Error setting safe bounds: {e}")
+            if str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error setting safe bounds: {e}")
+            else:
+                self.logger_local.error(f"Error setting safe bounds: {e}")
             return {"status":"error","message":f"Error setting safe bounds: {e}"}
- 
+
     def set_volume_to_travel_ratio(self, ratio_in_ul_per_mm: int):
         try:
             self.logger_local.info(f"Setting parameter: Volume to travel ratio = {ratio_in_ul_per_mm}ul/mm")
             self.robot.set_parameters(volume_to_travel_ratio=ratio_in_ul_per_mm)
             return {"status":"success","message":f"Parameter set: Volume to travel ratio = {ratio_in_ul_per_mm}ul/mm"}
         except Exception as e:
-            self.logger_local.error(f"Error setting Volume to travel ratio: {e}")
+            if str(e) == "Error opening serial port":
+                self.logger_local.critical(f"Error setting Volume to travel ratio: {e}")
+            else:
+                self.logger_local.error(f"Error setting Volume to travel ratio: {e}")
             return {"status":"error","message":f"Error setting Volume to travel ratio: {e}"}

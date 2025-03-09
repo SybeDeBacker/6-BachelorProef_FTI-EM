@@ -22,3 +22,4 @@ if __name__ == "__main__":
     Robot.set_microstep_size(256)
     Robot.eject_tip()
     
+    pause = input()
