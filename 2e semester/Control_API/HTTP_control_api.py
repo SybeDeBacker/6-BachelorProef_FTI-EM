@@ -97,7 +97,7 @@ class RobotControlAPI:
             self.logger_http_client.warning("Client failed to connect.")
             return False
 
-    def aspirate(self, volume_in_ul: int, rate_in_ul_per_s:int):
+    def aspirate(self, volume_in_ul: int, rate_in_ul_per_s:int) -> dict[str,str]:
         """Sends an aspirate command."""
         self.logger_http_client.info(f"Sending aspirate command: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s")
         if not self.connected:
@@ -110,8 +110,8 @@ class RobotControlAPI:
         }
 
         command_str = json.dumps(command)
-        self.send_message(command_str,"aspirate")
-        return{"status": "success", "message": f"Aspirate command sent: {volume_in_ul} ul at {rate_in_ul_per_s} ul/s"}
+        
+        return self.send_message(command_str,"aspirate")
 
     def dispense(self, volume_in_ul: int, rate_in_ul_per_s:int):
         """Sends an aspirate command."""
@@ -235,7 +235,7 @@ class RobotControlAPI:
         self.send_message(command_str, "set_safe_bounds")
         return{"status": "success", "message": f"Set bounds command sent: {bounds}"}
         
-    def send_message(self, message:str, endpoint:str):
+    def send_message(self, message:str, endpoint:str) -> dict[str,str]:
         if self.connected:
             try:
                 self.logger_http_client.info(f"Sending message: {message}")
@@ -248,20 +248,19 @@ class RobotControlAPI:
                     response = requests.get(f"{self.server_url}/{endpoint}")
                 status_code = response.status_code
                 response = response.json()
-                if status_code == 200:
-                    self.logger_http_client.info(response["message"])
-                    return response
-                elif status_code == 400:
-                    self.logger_http_client.warning(response["message"])
-                    return response
-                elif status_code == 504:
-                    self.logger_http_client.critical(response["message"])
-                    return response
-                else:
-                    self.logger_http_client.error(response["message"])
-                    return response
+                match status_code:
+                    case 200:   self.logger_http_client.info(response["message"])
+                    case 400:   self.logger_http_client.warning(response["message"])
+                    case 504:   self.logger_http_client.critical(response["message"])
+                    case _:     self.logger_http_client.error(response["message"])
+                return response
             except requests.exceptions.RequestException as e:
                 if (not self.check_server_availability()):
-                    self.logger_http_client.error("Server has disconnected")
+                    error = "Server has disconnected"
                 else:
-                    self.logger_http_client.error(f"Error sending message: {e}")
+                    error = f"Error sending message: {e}"
+                self.logger_http_client.error("Server has disconnected")
+                return {"status":"error","message":error}
+        else:
+            error = "Server has disconnected"
+            return {"status":"error","message":error}

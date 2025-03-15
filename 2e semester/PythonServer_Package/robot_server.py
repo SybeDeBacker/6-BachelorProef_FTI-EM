@@ -72,7 +72,7 @@ class RobotServer:
 
         self.logger_server.info(f"Server logging initialized. Logs are saved at: {log_files_path}")
 
-    def handle_aspirate_command(self):
+    def handle_aspirate_command(self)->tuple[dict[str,str],int]:
         try:
             command = request.get_json()
             volume = command.get("volume")
@@ -80,12 +80,12 @@ class RobotServer:
             self.logger_server.info(f"Received aspirate command: volume={volume}, rate={rate}")
             response = self.robot.aspirate_pipette(volume=volume, rate=rate)
             self.logger_server.info(f"{response["message"]}")
-            return jsonify({"status": "Success", "message": response["message"]}),200
+            return {"status": "Success", "message": response["message"]},200
         
         except Exception as e:
-            return self.exception_handler(str(e))
+            return self.exception_handler(str(e),"Error aspirating")
 
-    def handle_dispense_command(self):
+    def handle_dispense_command(self)->tuple[dict[str,str],int]:
         try:
             command = request.get_json()
             volume = command.get("volume")
@@ -93,62 +93,61 @@ class RobotServer:
             self.logger_server.info(f"Received dispense command: volume={volume}, rate={rate}")
             response = self.robot.dispense_pipette(volume=volume, rate=rate)
             self.logger_server.info(f"{response["message"]}")
-            return jsonify({"status": "Success", "message": f"{response["message"]}"})
+            return {"status": "Success", "message": f"{response["message"]}"},200
         
         except Exception as e:
-            return self.exception_handler(str(e))
+            return self.exception_handler(str(e), "Error dispensing")
 
-    def handle_ping(self):
+    def handle_ping(self)->tuple[dict[str,str],int]:
         self.logger_server.info("Received ping request")
-        return jsonify({"status": "Success", "message": "pong"})
+        return {"status": "Success", "message": "pong"},200
 
-    def handle_request(self):
+    def handle_request(self)->tuple[dict[str,str],int]:
         try:
             self.logger_server.info(f"Received volume request")
             current_volume = self.robot.get_current_volume()
-            return jsonify({"status": "Success", "message": f"Current volume: {current_volume} ul"}),200
+            return {"status": "Success", "message": f"Current volume: {current_volume} ul"},200
         except Exception as e:
-            return self.exception_handler(str(e))
+            return self.exception_handler(str(e), "Error handling volume request")
 
-    def handle_set_parameters(self):
+    def handle_set_parameters(self)->tuple[dict[str,str],int]:
         try:
             command = request.get_json()
             microsteps = command.get("stepper_pipet_microsteps")
             lead = command.get("pipet_lead")
             vtr = command.get("volume_to_travel_ratio")
             self.logger_server.info(f"Received set parameters command: microsteps={microsteps}, lead={lead}, vtr={vtr}")
-            return jsonify(self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr)),200
+            return self.robot.set_parameters(stepper_pipet_microsteps=microsteps, pipet_lead = lead, volume_to_travel_ratio = vtr),200
         
         except Exception as e:
-            return self.exception_handler(str(e))
+            return self.exception_handler(str(e), "Error handling set parameter command")
 
-    def handle_set_safe_bounds(self):
+    def handle_set_safe_bounds(self)->tuple[dict[str,str],int]:
         try:
             command = request.get_json()
             lower = command.get("lower")
             upper = command.get("upper")
             self.logger_server.info(f"Received set safe bounds command: [{upper},{lower}]")
-            return jsonify(self.robot.set_safe_bounds([lower,upper])),200
+            return self.robot.set_safe_bounds([lower,upper]),200
         
         except Exception as e:
-            return self.exception_handler(str(e))
+            return self.exception_handler(str(e),'Error setting safe bounds')
 
-    def handle_eject(self):
+    def handle_eject(self)->tuple[dict[str,str],int]:
         try:
             self.logger_server.info("Received eject tip command")
             self.robot.eject_tip()
-            return jsonify({"status": "Success", "message": "Tip ejected"}),200
+            return {"status": "Success", "message": "Tip ejected"},200
         except Exception as e:
-            return self.exception_handler(str(e))
+            return self.exception_handler(str(e),"Error processing eject command")
 
-    def zero_robot(self):
+    def zero_robot(self)->tuple[dict[str,str],int]:
         try:
             self.logger_server.info("Received zero robot command")
             self.robot.zero_robot()
-            return jsonify({"status": "Success", "message": "Robot homed. Current volume: 0"}),200
+            return {"status": "Success", "message": "Robot homed. Current volume: 0"},200
         except Exception as e:
-            self.logger_server.error(f"Error processing zero_robot command: {e}")
-            return jsonify({"status": "Error", "message": f"Error processing zero_robot command: {e}"}), 500
+            return self.exception_handler(str(e),"Error processing zero_robot command")
 
     def handle_serial_error(self):
         return "Error opening serial port"
@@ -161,17 +160,17 @@ class RobotServer:
 {"-"*width}\033[0m"""
         return errorstring
 
-    def exception_handler(self,e:str)->tuple:
-        if str(e) == "Position out of safe bounds":
-            self.logger_server.warning("Aspirate command out of safe bounds")
-            return jsonify({"status": "Error", "message": "Error processing aspirate command: Position out of safe bounds"}), 400
-        if str(e) == "Error opening serial port":
-            e = self.handle_serial_error()
-            self.logger_server.critical(f"Error processing command: {e}")
-            return jsonify({"status": "Error", "message": f"Error processing command: {e}"}), 504
+    def exception_handler(self,error_msg:str,error_template:str)->tuple[dict[str,str],int]:
+        if str(error_msg) == "Position out of safe bounds":
+            self.logger_server.warning(f"{error_template}: {error_msg}")
+            return {"status": "Error", "message": f"{error_template}: {error_msg}"}, 400
+        if str(error_msg) == "Error opening serial port":
+            error_msg = self.handle_serial_error()
+            self.logger_server.critical(f"{error_template}: {error_msg}")
+            return {"status": "Error", "message": f"{error_template}: {error_msg}"}, 504
         else:
-            self.logger_server.error(f"Error processing aspirate: {e}")
-        return jsonify({"status": "Error", "message": f"Error processing command: {e}"}), 500
+            self.logger_server.error(f"{error_template}: {error_msg}")
+        return {"status": "Error", "message": f"{error_template}: {error_msg}"}, 500
 
     def run(self, host, port):
         from waitress import serve

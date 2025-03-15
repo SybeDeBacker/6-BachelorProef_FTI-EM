@@ -166,7 +166,7 @@ class RobotObject:
         self.send_command(eject_tip_command, print_confirmation=print_confirmation)
         return {"status":"success"}
 
-    def set_parameters(self, stepper_pipet_microsteps: int = 0, pipet_lead: int = 0, volume_to_travel_ratio: int = 0, print_confirmation: bool = True) -> dict:
+    def set_parameters(self, stepper_pipet_microsteps: int = 0, pipet_lead: int = 0, volume_to_travel_ratio: int = 0, print_confirmation: bool = True) -> dict[str,str]:
         if stepper_pipet_microsteps == 0 and pipet_lead == 0 and volume_to_travel_ratio == 0:
             return {"status": "error", "message": "No parameters provided"}
         if stepper_pipet_microsteps < 0 or pipet_lead < 0 or volume_to_travel_ratio < 0:
@@ -189,20 +189,22 @@ class RobotObject:
 
         return {"status": "success", "message": f"Parameters set: Microsteps: {self.stepper_pipet_microsteps}, Lead: {self.pipet_lead}, VolumeToTravel ratio: {self.volume_to_travel_ratio}"}
 
-    def get_current_volume(self):
+    def get_current_volume(self) -> int:
         self.logger_robot.info(f"Received volume request: Current volume: {self.current_volume} ul")
         return self.current_volume
 
-    def is_action_safe(self, volume: int):
+    def is_action_safe(self, volume: int) -> bool:
         self.logger_robot.info(f"Received safety request for v = {volume}ul with bounds = {self.safe_bounds} and current volume = {self.current_volume} ul")
         return self.safe_bounds[0] <= self.current_volume + volume <= self.safe_bounds[1]
 
-    def zero_robot(self, print_confirmation: bool = True):
-        response: dict = self.send_command("Z", print_confirmation=print_confirmation)
+    def zero_robot(self, print_confirmation: bool = True) -> dict[str,str]:
+        response: dict[str,str] = self.send_command("Z", print_confirmation=print_confirmation)
         status = response["status"] == "success"
         self.current_volume = 0 if status else self.current_volume
         if not status:
             raise Exception("Arduino failed to zero robot")
+        else:
+            return response
 
     def sanitize_json(self, json_string: str) -> str:
         json_string = json_string.strip()
@@ -212,7 +214,7 @@ class RobotObject:
             return ""
         return json_string
 
-    def receive_response(self, print_confirmation: bool = True, startup: bool = False) -> dict:
+    def receive_response(self, print_confirmation: bool = True, startup: bool = False) -> dict[str,str]:
         try:
             start_time = time()
             while True:
@@ -247,6 +249,8 @@ class RobotObject:
                             else:
                                 raise Exception("Robot could not execute command")
                         else:
+                            if "message" not in response.keys():
+                                response["message"] = "No message from Arduino"
                             return response
                     except Exception as e:
                         raise e
