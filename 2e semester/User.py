@@ -1,4 +1,4 @@
-from Control_API import LocalRobotControlAPI as RobotControlAPI
+from Control_API import HTTPRobotControlAPI as RobotControlAPI
 
 # Example: Send a "MOVE" command
 if __name__ == "__main__":
@@ -6,7 +6,7 @@ if __name__ == "__main__":
     ROBOT_IP = '10.0.1.250'  # Arduino's IP address (set in your Arduino sketch)
     ROBOT_URL = f"http://{ROBOT_IP}"
     # Connect to the robot server
-    Robot = RobotControlAPI(serial_port='COM7', baud_rate=9600)
+    Robot = RobotControlAPI(server_url=ROBOT_URL)
 
     # Start a loop to send commands and pings
     Robot.zero_robot()
