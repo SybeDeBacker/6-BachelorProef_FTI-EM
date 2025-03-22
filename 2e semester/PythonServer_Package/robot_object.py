@@ -1,7 +1,7 @@
 import serial # Module needed for serial communication
 import logging
 import colorlog
-import re
+from math import pi
 from json import loads as dictify, JSONDecodeError
 from time import time
 import os
@@ -15,7 +15,7 @@ class RobotObject:
         self.safe_bounds = [0, 1000] #ul
         self.stepper_pipet_microsteps = 8
         self.pipet_lead = 1 #mm/rev
-        self.volume_to_travel_ratio = 20 #ul/mm
+        self.volume_to_travel_ratio = (4/2)**2*pi
         self.timeout = timeout #s
         
         self.serial_connected = False
