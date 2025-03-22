@@ -6,10 +6,10 @@ import colorlog
 from .robot_object_import import RobotObject
 
 class RobotControlAPI:
-    def __init__(self,log_files_path:str = "C:/Users/Sybe/Documents/!UAntwerpen/6e Semester/6 - Bachelorproef/Code/Github/6-BachelorProef_FTI-EM_CoSysLab/2e semester/PythonServer_Package/logs"):
+    def __init__(self,serial_port:str,baud_rate:int,log_files_path:str = "C:/Users/Sybe/Documents/!UAntwerpen/6e Semester/6 - Bachelorproef/Code/Github/6-BachelorProef_FTI-EM_CoSysLab/2e semester/PythonServer_Package/logs"):
         self.setup_logging(log_files_path)
         try:
-            self.robot = RobotObject(serial_port='COM3', baud_rate=9600)
+            self.robot = RobotObject(serial_port=serial_port, baud_rate=baud_rate)
             self.robot.setup_logging(log_files_path=log_files_path)
             self.robot.connect_serial()
         except Exception as e:

@@ -1,8 +1,8 @@
 #include <ESP_FlexyStepper.h>
 #include "config.h"
 
-const int dirPin = 1;
-const int stepPin = 2;
+const int dirPin = 22;
+const int stepPin = 23;
 const int enablePin = 7;
 const int limitSwitchMin = 8;  // Minimum limit switch pin
 const int limitSwitchMax = 9;  // Maximum limit switch pin
@@ -20,6 +20,7 @@ volatile bool limitSwitchMinTriggered = false;
 volatile bool limitSwitchMaxTriggered = false;
 
 // Interrupt Service Routines for limit switches
+/*
 void IRAM_ATTR limitSwitchMinISR() {
   limitSwitchMinTriggered = true;
 }
@@ -27,25 +28,29 @@ void IRAM_ATTR limitSwitchMinISR() {
 void IRAM_ATTR limitSwitchMaxISR() {
   limitSwitchMaxTriggered = true;
 }
-
+*/
 void setup() {
   // Disable the watchdog timer at the start
   Serial.begin(9600);
   Serial.println("Serial started");
   
+  delay(50);
+  
   // Configure limit switch pins with internal pullup
+  /*
   pinMode(limitSwitchMin, INPUT_PULLUP);
   pinMode(limitSwitchMax, INPUT_PULLUP);
-
+  
   // Attach interrupts to the limit switches (assuming a FALLING edge when activated)
   attachInterrupt(digitalPinToInterrupt(limitSwitchMin), limitSwitchMinISR, FALLING);
   attachInterrupt(digitalPinToInterrupt(limitSwitchMax), limitSwitchMaxISR, FALLING);
-
+  */
   if (USE_STEPPER_MOTOR) {
     stepper.connectToPins(stepPin, dirPin);
     stepper.setStepsPerRevolution(200 * STEPPER_PIPET_MICROSTEPS);
-    stepper.setSpeedInStepsPerSecond(2000);  // Default speed (steps per second)
-    stepper.setAccelerationInStepsPerSecondPerSecond(5000);
+    stepper.setSpeedInStepsPerSecond(1600);  // Default speed (steps per second)
+    stepper.setAccelerationInStepsPerSecondPerSecond(2000);
+    stepper.setDecelerationInStepsPerSecondPerSecond(5000);
   }
 }
 
@@ -95,7 +100,7 @@ String execute_command(String data) {
     return "{\"status\":\"success\",\"message\":\"pong\"}";
   } 
   else if (data == "Z") {
-    return "{\"status\":\"success\"}";
+    return "{\"status\":\"success\",\"message\":\"Robot zeroed\"}";
   } 
   else {
     return "{\"status\":\"error\",\"message\":\"No valid parameters given " + String(data) + "\"}";
@@ -103,7 +108,7 @@ String execute_command(String data) {
 }
 
 String aspirate(float aspiration_volume, float aspiration_rate) {
-  float travel = aspiration_volume / VOLUME_TO_TRAVEL_RATIO;
+  float travel = -aspiration_volume / VOLUME_TO_TRAVEL_RATIO;
   float rotations = travel / LEAD;
   int steps = round(rotations * 200 * STEPPER_PIPET_MICROSTEPS);
   // Calculate speed in revolutions per second (rps) by removing the factor of 60
@@ -117,12 +122,11 @@ String aspirate(float aspiration_volume, float aspiration_rate) {
 }
 
 String dispense(float dispense_volume, float dispense_rate) {
-  float travel = -dispense_volume / VOLUME_TO_TRAVEL_RATIO;
+  float travel = dispense_volume / VOLUME_TO_TRAVEL_RATIO;
   float rotations = travel / LEAD;
   int steps = round(rotations * 200 * STEPPER_PIPET_MICROSTEPS);
   // Calculate speed in revolutions per second (rps)
   float rps = (dispense_rate / VOLUME_TO_TRAVEL_RATIO) / LEAD;
-
   if (moveStepper(steps, rps)) {
     return "{\"status\":\"success\", \"message\": \"Dispensed " + String(steps) + " steps at " + String(rps) + " rps\"}";
   } else {
@@ -131,7 +135,7 @@ String dispense(float dispense_volume, float dispense_rate) {
 }
 
 String eject() {
-  return "{\"status\":\"success\"}";
+  return "{\"status\":\"success\",\"message\":\"Tip Ejected\"}";
 }
 
 bool moveStepper(int steps, float rps) {

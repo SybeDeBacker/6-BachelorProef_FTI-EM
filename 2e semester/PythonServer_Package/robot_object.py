@@ -7,15 +7,15 @@ from time import time
 import os
 
 class RobotObject:
-    def __init__(self, serial_port: str = 'COM3', baud_rate: int = 9600, timeout: int = 5) -> None:        
+    def __init__(self, serial_port: str = 'COM3', baud_rate: int = 9600, timeout: int = 10) -> None:        
         self.serial_port = serial_port
         self.baud_rate = baud_rate
 
         self.current_volume = 0 #ul
         self.safe_bounds = [0, 1000] #ul
-        self.stepper_pipet_microsteps = 16
+        self.stepper_pipet_microsteps = 8
         self.pipet_lead = 1 #mm/rev
-        self.volume_to_travel_ratio = 100 #ul/mm
+        self.volume_to_travel_ratio = 20 #ul/mm
         self.timeout = timeout #s
         
         self.serial_connected = False
@@ -97,7 +97,7 @@ class RobotObject:
             self.ser.close()
             self.logger_robot.error("Serial not responding")
             raise Exception("Serial not responding")
-        
+        return None
         try:
             self.set_parameters(self.stepper_pipet_microsteps, self.pipet_lead, self.volume_to_travel_ratio, print_confirmation=True)
         except:
@@ -144,8 +144,12 @@ class RobotObject:
         if print_confirmation:
             self.logger_robot.info(f"{action.capitalize()[:-1]}ing {volume} ul at a rate of {rate} ul/s")
 
+        temp_timeout = self.timeout
+        self.timeout = 60*2
+
         command = f"{action[0].upper()}{volume} R{rate}"
         success = self.send_command(command, print_confirmation=print_confirmation)["status"] == "success"
+        self.timeout = temp_timeout
         if not success:
             raise Exception("Arduino failed to actuate pipette")
         
@@ -163,8 +167,7 @@ class RobotObject:
 
     def eject_tip(self, print_confirmation: bool = True)-> dict[str,str]:
         eject_tip_command = "E"
-        self.send_command(eject_tip_command, print_confirmation=print_confirmation)
-        return {"status":"success"}
+        return self.send_command(eject_tip_command, print_confirmation=print_confirmation)
 
     def set_parameters(self, stepper_pipet_microsteps: int = 0, pipet_lead: int = 0, volume_to_travel_ratio: int = 0, print_confirmation: bool = True) -> dict[str,str]:
         if stepper_pipet_microsteps == 0 and pipet_lead == 0 and volume_to_travel_ratio == 0:
@@ -262,7 +265,7 @@ class RobotObject:
             self.logger_robot.error(f"Exception in receive_response: {e}")
             raise Exception(e)
 
-    def set_safe_bounds(self, safe_bounds: list[int]):
+    def set_safe_bounds(self, safe_bounds: list[int])-> dict[str,str]:
         try:
             self.logger_robot.info(f"Received set safe bounds command: {safe_bounds}")
             self.safe_bounds = safe_bounds
