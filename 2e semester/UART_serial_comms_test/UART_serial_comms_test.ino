@@ -1,71 +1,53 @@
+#include <TMCStepper.h>
 #include <ESP_FlexyStepper.h>
-#include "config.h"
 
+// UART Pins (adjust if you use different ones)
+#define RX_PIN 17  // ESP32 GPIO receiving from TMC2209 TX
+#define TX_PIN 16  // ESP32 GPIO sending to TMC2209 RX
 const int dirPin = 22;
 const int stepPin = 23;
-const int enablePin = 7;
-const int limitSwitchMin = 8;  // Minimum limit switch pin
-const int limitSwitchMax = 9;  // Maximum limit switch pin
+#define DRIVER_ADDRESS 0b00 // Use this if only 1 driver on UART
+
+int STEPPER_PIPET_MICROSTEPS = 8; // Microsteps
+float LEAD = 1;               // mm/rev
+float VOLUME_TO_TRAVEL_RATIO = float(sq(2)*3.14159); // ul/mm
+
+// Hardware Serial instance (Serial1 uses GPIO9 & GPIO10 by default; we override it)
+HardwareSerial TMCSerial(1); // Use UART1
 
 ESP_FlexyStepper stepper;
+TMC2209Stepper driver(&TMCSerial, 0.11, DRIVER_ADDRESS);
 
-int STEPPER_PIPET_MICROSTEPS = STEPPER_PIPET_MICROSTEPS_CONFIG; // Microsteps
-float LEAD = LEAD_CONFIG;               // mm/rev
-float VOLUME_TO_TRAVEL_RATIO = VOLUME_TO_TRAVEL_RATIO_CONFIG; // ul/mm
-
-String DEBUG_INFO = "";
-
-// Volatile flags for limit switches, set by their interrupt routines
-volatile bool limitSwitchMinTriggered = false;
-volatile bool limitSwitchMaxTriggered = false;
-
-// Interrupt Service Routines for limit switches
-/*
-void IRAM_ATTR limitSwitchMinISR() {
-  limitSwitchMinTriggered = true;
-}
-
-void IRAM_ATTR limitSwitchMaxISR() {
-  limitSwitchMaxTriggered = true;
-}
-*/
 void setup() {
-  // Disable the watchdog timer at the start
-  Serial.begin(9600);
-  Serial.println("Serial started");
-  
-  delay(50);
-  
-  // Configure limit switch pins with internal pullup
-  /*
-  pinMode(limitSwitchMin, INPUT_PULLUP);
-  pinMode(limitSwitchMax, INPUT_PULLUP);
-  
-  // Attach interrupts to the limit switches (assuming a FALLING edge when activated)
-  attachInterrupt(digitalPinToInterrupt(limitSwitchMin), limitSwitchMinISR, FALLING);
-  attachInterrupt(digitalPinToInterrupt(limitSwitchMax), limitSwitchMaxISR, FALLING);
-  */
-  if (USE_STEPPER_MOTOR) {
-    stepper.connectToPins(stepPin, dirPin);
-    stepper.setStepsPerRevolution(200 * STEPPER_PIPET_MICROSTEPS);
-    stepper.setSpeedInStepsPerSecond(1600);  // Default speed (steps per second)
-    stepper.setAccelerationInStepsPerSecondPerSecond(1000);
-    stepper.setDecelerationInStepsPerSecondPerSecond(1000);
-  }
+  Serial.begin(115200);
+  while (!Serial);
+
+  Serial.println("Initializing UART with TMC2209...");
+  stepper.connectToPins(stepPin, dirPin);
+  stepper.setStepsPerRevolution(200 * STEPPER_PIPET_MICROSTEPS);
+  stepper.setSpeedInStepsPerSecond(200*STEPPER_PIPET_MICROSTEPS);  // Default speed (steps per second)
+  stepper.setAccelerationInStepsPerSecondPerSecond(200*STEPPER_PIPET_MICROSTEPS);
+  stepper.setDecelerationInStepsPerSecondPerSecond(200*STEPPER_PIPET_MICROSTEPS);
+  // Start serial port for TMC2209
+  TMCSerial.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+
+  // Initialize driver
+  driver.begin();             // SPI: Init pins and register
+  driver.toff(5);             // Enable driver (non-zero value)
+  driver.rms_current(200);
+  driver.microsteps(STEPPER_PIPET_MICROSTEPS);      // Set microsteps (e.g., 16, 32, etc.)
+  driver.pdn_disable(true);   // Use UART
+  driver.I_scale_analog(false); // Use internal voltage reference
+
+  Serial.println("TMC2209 initialized.");
 }
 
 void loop() {
   if (Serial.available() > 0) {
     String command_str = Serial.readStringUntil('\n');
     String response = execute_command(command_str);
-    if (ENABLE_DEBUG) {
-      response = response.substring(0, response.length() - 1);
-      response += ", \"debug_info\":\"" + DEBUG_INFO + "\"}";
-    }
     Serial.println(response);
   }
-  
-  // Continuously update the stepper movement
   stepper.processMovement();
 }
 
@@ -139,24 +121,12 @@ String eject() {
 }
 
 bool moveStepper(int steps, float rps) {
-  if (PRETEND_FALSE) return false;
-  if (!USE_STEPPER_MOTOR) return true;
-
   stepper.setSpeedInRevolutionsPerSecond(rps);
   stepper.setTargetPositionRelativeInSteps(steps);
 
   // Wait until movement is completed or a limit switch interrupt triggers
   while (!stepper.motionComplete()) {
     stepper.processMovement();
-
-    // Check if a limit switch has been triggered via its interrupt
-    if (limitSwitchMinTriggered || limitSwitchMaxTriggered) {
-      stepper.emergencyStop();
-      // Clear the flags after stopping the motor
-      limitSwitchMinTriggered = false;
-      limitSwitchMaxTriggered = false;
-      return false; // Movement stopped due to limit switch
-    }
   }
 
   return true;

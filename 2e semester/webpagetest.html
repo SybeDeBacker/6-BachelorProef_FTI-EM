@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Robot Control Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: auto;
+    }
+    h2 {
+      color: #333;
+    }
+    input, button {
+      padding: 6px;
+      margin: 5px;
+    }
+    .section {
+      margin-bottom: 30px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 20px;
+    }
+    #output {
+      margin-top: 20px;
+      white-space: pre-wrap;
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🤖 Robot Control Panel</h1>
+
+  <div class="section">
+    <h2>Aspirate</h2>
+    Volume: <input id="aspirate_volume" type="number" /> Rate: <input id="aspirate_rate" type="number" />
+    <button onclick="sendCommand('/aspirate', { volume: getVal('aspirate_volume'), rate: getVal('aspirate_rate') })">Aspirate</button>
+  </div>
+
+  <div class="section">
+    <h2>Dispense</h2>
+    Volume: <input id="dispense_volume" type="number" /> Rate: <input id="dispense_rate" type="number" />
+    <button onclick="sendCommand('/dispense', { volume: getVal('dispense_volume'), rate: getVal('dispense_rate') })">Dispense</button>
+  </div>
+
+  <div class="section">
+    <h2>Set Parameters</h2>
+    Microsteps: <input id="microsteps" type="number" />
+    Lead: <input id="lead" type="number" />
+    Volume-to-Travel Ratio: <input id="vtr" type="number" />
+    <button onclick="sendCommand('/set_parameters', {
+      stepper_pipet_microsteps: getVal('microsteps'),
+      pipet_lead: getVal('lead'),
+      volume_to_travel_ratio: getVal('vtr')
+    })">Set Parameters</button>
+  </div>
+
+  <div class="section">
+    <h2>Set Safe Bounds</h2>
+    Lower: <input id="lower" type="number" />
+    Upper: <input id="upper" type="number" />
+    <button onclick="sendCommand('/set_safe_bounds', {
+      lower: getVal('lower'),
+      upper: getVal('upper')
+    })">Set Safe Bounds</button>
+  </div>
+
+  <div class="section">
+    <h2>Utility</h2>
+    <button onclick="sendGet('/ping')">Ping</button>
+    <button onclick="sendGet('/request')">Request Volume</button>
+    <button onclick="sendGet('/zero_robot')">Zero Robot</button>
+    <button onclick="sendGet('/eject_tip')">Eject Tip</button>
+  </div>
+
+  <h2>Server Response</h2>
+  <div id="output"></div>
+
+  <script>
+    const baseUrl = "http://127.0.0.1";
+
+    function getVal(id) {
+      return document.getElementById(id).value;
+    }
+
+    async function sendCommand(endpoint, body) {
+      try {
+        console.log(body);
+        const res = await fetch(baseUrl + endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('output').textContent = `Error: ${err}`;
+      }
+    }
+
+    async function sendGet(endpoint) {
+      try {
+        const res = await fetch(baseUrl + endpoint);
+        const data = await res.json();
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById('output').textContent = `Error: ${err}`;
+      }
+    }
+  </script>
+</body>
+</html>
