@@ -1,17 +1,19 @@
 #include <TMCStepper.h>
 #include <ESP_FlexyStepper.h>
+#include "config.h"
+
 
 // UART Pins (adjust if you use different ones)
 #define RX_PIN 17  // ESP32 GPIO receiving from TMC2209 TX
 #define TX_PIN 16  // ESP32 GPIO sending to TMC2209 RX
+#define LimitSwitch 19
 const int dirPin = 22;
 const int stepPin = 23;
 #define DRIVER_ADDRESS 0b00 // Use this if only 1 driver on UART
 
-int STEPPER_PIPET_MICROSTEPS = 8; // Microsteps
-float LEAD = 1;               // mm/rev
-float VOLUME_TO_TRAVEL_RATIO = float(sq(2)*3.14159); // ul/mm
-
+int STEPPER_PIPET_MICROSTEPS = STEPPER_PIPET_MICROSTEPS_CONFIG; // Microsteps
+float LEAD = LEAD_CONFIG;               // mm/rev
+float VOLUME_TO_TRAVEL_RATIO = VOLUME_TO_TRAVEL_RATIO_CONFIG; // ul/mm
 // Hardware Serial instance (Serial1 uses GPIO9 & GPIO10 by default; we override it)
 HardwareSerial TMCSerial(1); // Use UART1
 
@@ -40,6 +42,7 @@ void setup() {
   driver.I_scale_analog(false); // Use internal voltage reference
 
   Serial.println("TMC2209 initialized.");
+  pinMode(LimitSwitch,INPUT_PULLUP);
 }
 
 void loop() {
@@ -53,12 +56,12 @@ void loop() {
 
 String execute_command(String data) {
   if (data.indexOf("A") == 0) {
-    float aspiration_volume = data.substring(1, data.indexOf("R") - 1).toFloat();
+    float aspiration_volume = data.substring(1, data.indexOf("R")).toFloat();
     float aspiration_rate = data.substring(data.indexOf("R") + 1, data.length()).toFloat();
     return aspirate(aspiration_volume, aspiration_rate);
   } 
   else if (data.indexOf("D") == 0) {
-    float dispense_volume = data.substring(1, data.indexOf("R") - 1).toFloat();
+    float dispense_volume = data.substring(1, data.indexOf("R")).toFloat();
     float dispense_rate = data.substring(data.indexOf("R") + 1, data.length()).toFloat();
     return dispense(dispense_volume, dispense_rate);
   } 
@@ -66,8 +69,8 @@ String execute_command(String data) {
     return eject();
   } 
   else if (data.indexOf("S") == 0) {
-    int microsteps = data.substring(1, data.indexOf("L") - 1).toInt();
-    float lead = data.substring(data.indexOf("L") + 1, data.indexOf("V") - 1).toFloat();
+    int microsteps = data.substring(1, data.indexOf("L")).toInt();
+    float lead = data.substring(data.indexOf("L") + 1, data.indexOf("V")).toFloat();
     float volume_tt_ratio = data.substring(data.indexOf("V") + 1, data.length()).toFloat();
 
     if (microsteps > 0) STEPPER_PIPET_MICROSTEPS = microsteps;
@@ -82,7 +85,7 @@ String execute_command(String data) {
     return "{\"status\":\"success\",\"message\":\"pong\"}";
   } 
   else if (data == "Z") {
-    return "{\"status\":\"success\",\"message\":\"Robot zeroed\"}";
+    return zero_robot();
   } 
   else {
     return "{\"status\":\"error\",\"message\":\"No valid parameters given " + String(data) + "\"}";
@@ -126,8 +129,42 @@ bool moveStepper(int steps, float rps) {
 
   // Wait until movement is completed or a limit switch interrupt triggers
   while (!stepper.motionComplete()) {
+    if ((!digitalRead(LimitSwitch)==1)&&(steps>0)){
+      stepper.emergencyStop();
+      return false;
+    }
     stepper.processMovement();
   }
 
   return true;
+}
+
+String zero_robot() {
+  stepper.setSpeedInRevolutionsPerSecond(2);
+  stepper.setTargetPositionRelativeInSteps(100000*(STEPPER_PIPET_MICROSTEPS/8));
+
+  // Wait until movement is completed or a limit switch interrupt triggers
+  while (!stepper.motionComplete()) {
+    if (!digitalRead(LimitSwitch)==1){
+      stepper.setCurrentPositionAsHomeAndStop();
+      break;
+    }
+    stepper.processMovement();
+  }
+
+  if (digitalRead(LimitSwitch)==1){
+    return "{\"status\":\"error\",\"message\":\"Failed to zero robot\"}";
+  }
+
+  stepper.setSpeedInRevolutionsPerSecond(0.5);
+  stepper.setTargetPositionRelativeInSteps(-2000*STEPPER_PIPET_MICROSTEPS);
+  delay(10);
+  while (!stepper.motionComplete()) {
+    if (digitalRead(LimitSwitch)==1){
+      stepper.setCurrentPositionAsHomeAndStop();
+      return "{\"status\":\"success\",\"message\":\"Robot zeroed\"}";
+    }
+    stepper.processMovement();
+  }
+  return "{\"status\":\"error\",\"message\":\"Failed to zero robot\"}";
 }
