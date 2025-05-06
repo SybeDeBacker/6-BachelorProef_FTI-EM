@@ -2,20 +2,20 @@
 #include <ESP_FlexyStepper.h>
 #include "config.h"
 
-
-// UART Pins (adjust if you use different ones)
+// UART Pins
 #define RX_PIN 17  // ESP32 GPIO receiving from TMC2209 TX
 #define TX_PIN 16  // ESP32 GPIO sending to TMC2209 RX
 #define LimitSwitch 19
 const int dirPin = 22;
 const int stepPin = 23;
-#define DRIVER_ADDRESS 0b00 // Use this if only 1 driver on UART
+#define DRIVER_ADDRESS 0b00 // Only 1 driver on UART
 
-int STEPPER_PIPET_MICROSTEPS = STEPPER_PIPET_MICROSTEPS_CONFIG; // Microsteps
-float LEAD = LEAD_CONFIG;               // mm/rev
-float VOLUME_TO_TRAVEL_RATIO = VOLUME_TO_TRAVEL_RATIO_CONFIG; // ul/mm
-// Hardware Serial instance (Serial1 uses GPIO9 & GPIO10 by default; we override it)
-HardwareSerial TMCSerial(1); // Use UART1
+float CALIBRATION_OFFSET = 13.5;
+int STEPPER_PIPET_MICROSTEPS = STEPPER_PIPET_MICROSTEPS_CONFIG;
+float LEAD = LEAD_CONFIG;
+float VOLUME_TO_TRAVEL_RATIO = VOLUME_TO_TRAVEL_RATIO_CONFIG;
+
+HardwareSerial TMCSerial(1);
 
 ESP_FlexyStepper stepper;
 TMC2209Stepper driver(&TMCSerial, 0.11, DRIVER_ADDRESS);
@@ -27,22 +27,29 @@ void setup() {
   Serial.println("Initializing UART with TMC2209...");
   stepper.connectToPins(stepPin, dirPin);
   stepper.setStepsPerRevolution(200 * STEPPER_PIPET_MICROSTEPS);
-  stepper.setSpeedInStepsPerSecond(200*STEPPER_PIPET_MICROSTEPS);  // Default speed (steps per second)
-  stepper.setAccelerationInStepsPerSecondPerSecond(200*STEPPER_PIPET_MICROSTEPS);
-  stepper.setDecelerationInStepsPerSecondPerSecond(200*STEPPER_PIPET_MICROSTEPS);
-  // Start serial port for TMC2209
+  stepper.setSpeedInStepsPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
+  stepper.setAccelerationInStepsPerSecondPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
+  stepper.setDecelerationInStepsPerSecondPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
+
   TMCSerial.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
 
-  // Initialize driver
-  driver.begin();             // SPI: Init pins and register
-  driver.toff(5);             // Enable driver (non-zero value)
-  driver.rms_current(200);
-  driver.microsteps(STEPPER_PIPET_MICROSTEPS);      // Set microsteps (e.g., 16, 32, etc.)
-  driver.pdn_disable(true);   // Use UART
-  driver.I_scale_analog(false); // Use internal voltage reference
+  driver.begin();
+  driver.toff(5);
+  driver.rms_current(150);
+  driver.microsteps(STEPPER_PIPET_MICROSTEPS);
+  driver.pdn_disable(true);
+  driver.I_scale_analog(false);
 
-  Serial.println("TMC2209 initialized.");
-  pinMode(LimitSwitch,INPUT_PULLUP);
+  // Enable StallGuard (sensorless stall detection)
+  /*
+  driver.TCOOLTHRS(0xFFFFF);
+  driver.semin(5);
+  driver.semax(2);
+  driver.sedn(0b01);
+  */
+
+  Serial.println("TMC2209 and StallGuard initialized.");
+  pinMode(LimitSwitch, INPUT_PULLUP);
 }
 
 void loop() {
@@ -73,7 +80,14 @@ String execute_command(String data) {
     float lead = data.substring(data.indexOf("L") + 1, data.indexOf("V")).toFloat();
     float volume_tt_ratio = data.substring(data.indexOf("V") + 1, data.length()).toFloat();
 
-    if (microsteps > 0) STEPPER_PIPET_MICROSTEPS = microsteps;
+    if (microsteps > 0) {
+      STEPPER_PIPET_MICROSTEPS = microsteps;
+      driver.microsteps(microsteps);
+      stepper.setStepsPerRevolution(200 * STEPPER_PIPET_MICROSTEPS);
+      stepper.setSpeedInStepsPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
+      stepper.setAccelerationInStepsPerSecondPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
+      stepper.setDecelerationInStepsPerSecondPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
+    }
     if (lead > 0) LEAD = lead;
     if (volume_tt_ratio > 0) VOLUME_TO_TRAVEL_RATIO = volume_tt_ratio;
 
@@ -87,16 +101,19 @@ String execute_command(String data) {
   else if (data == "Z") {
     return zero_robot();
   } 
+  else if (data.indexOf("O") == 0) {
+    CALIBRATION_OFFSET = data.substring(1, data.length()).toFloat();
+    return "{\"status\":\"success\",\"message\":\"Volume offset set to " + String(CALIBRATION_OFFSET) +" ul\"}";
+  }
   else {
     return "{\"status\":\"error\",\"message\":\"No valid parameters given " + String(data) + "\"}";
   }
 }
 
 String aspirate(float aspiration_volume, float aspiration_rate) {
-  float travel = -aspiration_volume / VOLUME_TO_TRAVEL_RATIO;
+  float travel = -(aspiration_volume + CALIBRATION_OFFSET) / VOLUME_TO_TRAVEL_RATIO;
   float rotations = travel / LEAD;
   int steps = round(rotations * 200 * STEPPER_PIPET_MICROSTEPS);
-  // Calculate speed in revolutions per second (rps) by removing the factor of 60
   float rps = (aspiration_rate / VOLUME_TO_TRAVEL_RATIO) / LEAD;
 
   if (moveStepper(steps, rps)) {
@@ -107,11 +124,11 @@ String aspirate(float aspiration_volume, float aspiration_rate) {
 }
 
 String dispense(float dispense_volume, float dispense_rate) {
-  float travel = dispense_volume / VOLUME_TO_TRAVEL_RATIO;
+  float travel = (dispense_volume + CALIBRATION_OFFSET) / VOLUME_TO_TRAVEL_RATIO;
   float rotations = travel / LEAD;
   int steps = round(rotations * 200 * STEPPER_PIPET_MICROSTEPS);
-  // Calculate speed in revolutions per second (rps)
   float rps = (dispense_rate / VOLUME_TO_TRAVEL_RATIO) / LEAD;
+
   if (moveStepper(steps, rps)) {
     return "{\"status\":\"success\", \"message\": \"Dispensed " + String(steps) + " steps at " + String(rps) + " rps\"}";
   } else {
@@ -127,12 +144,23 @@ bool moveStepper(int steps, float rps) {
   stepper.setSpeedInRevolutionsPerSecond(rps);
   stepper.setTargetPositionRelativeInSteps(steps);
 
-  // Wait until movement is completed or a limit switch interrupt triggers
   while (!stepper.motionComplete()) {
-    if ((!digitalRead(LimitSwitch)==1)&&(steps>0)){
+    // Limit switch check
+    if ((!digitalRead(LimitSwitch) == 1) && (steps > 0)) {
       stepper.emergencyStop();
+      Serial.println("Limit switch triggered!");
       return false;
     }
+
+    /*
+    // Stall detection check
+    uint16_t sg_result = driver.SG_RESULT();
+    if (sg_result < 500) {  // Adjust threshold as needed
+      stepper.emergencyStop();
+      Serial.println("Stall detected!");
+      return false;
+    }
+    */
     stepper.processMovement();
   }
 
@@ -141,26 +169,25 @@ bool moveStepper(int steps, float rps) {
 
 String zero_robot() {
   stepper.setSpeedInRevolutionsPerSecond(2);
-  stepper.setTargetPositionRelativeInSteps(100000*(STEPPER_PIPET_MICROSTEPS/8));
+  stepper.setTargetPositionRelativeInSteps(100000 * (STEPPER_PIPET_MICROSTEPS / 8));
 
-  // Wait until movement is completed or a limit switch interrupt triggers
   while (!stepper.motionComplete()) {
-    if (!digitalRead(LimitSwitch)==1){
+    if (!digitalRead(LimitSwitch) == 1) {
       stepper.setCurrentPositionAsHomeAndStop();
       break;
     }
     stepper.processMovement();
   }
 
-  if (digitalRead(LimitSwitch)==1){
+  if (digitalRead(LimitSwitch) == 1) {
     return "{\"status\":\"error\",\"message\":\"Failed to zero robot\"}";
   }
 
   stepper.setSpeedInRevolutionsPerSecond(0.5);
-  stepper.setTargetPositionRelativeInSteps(-2000*STEPPER_PIPET_MICROSTEPS);
+  stepper.setTargetPositionRelativeInSteps(-2000 * STEPPER_PIPET_MICROSTEPS);
   delay(10);
   while (!stepper.motionComplete()) {
-    if (digitalRead(LimitSwitch)==1){
+    if (digitalRead(LimitSwitch) == 1) {
       stepper.setCurrentPositionAsHomeAndStop();
       return "{\"status\":\"success\",\"message\":\"Robot zeroed\"}";
     }

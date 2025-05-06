@@ -7,12 +7,7 @@ if __name__ == "__main__":
     ROBOT_URL:str = f"http://{ROBOT_IP}"
     # Connect to the robot server
     Robot = RobotControlAPI(server_url=ROBOT_URL)
-
     # Start a loop to send commands and pings
-    Robot.zero_robot()
-    Robot.set_safe_bounds([10000,10])
-    Robot.aspirate(5000, 200)
-    Robot.dispense(800, 200)
-    Robot.eject_tip()
+    Robot.set_calibration_offset(offset=0)
     
     pause = input() 

@@ -192,6 +192,12 @@ class RobotObject:
 
         return {"status": "success", "message": f"Parameters set: Microsteps: {self.stepper_pipet_microsteps}, Lead: {self.pipet_lead}, VolumeToTravel ratio: {self.volume_to_travel_ratio}"}
 
+    def set_calibration_offset(self, offset: float = 0.0, print_confirmation: bool = True) -> dict[str,str]:
+        if print_confirmation:
+            self.logger_robot.info(f"Setting calibration offset to: {offset} ul")
+        self.send_command(f"O{offset}", print_confirmation=print_confirmation)
+        return {"status": "success", "message": f"Calibration set to {offset} ul"}
+
     def get_current_volume(self) -> int:
         self.logger_robot.info(f"Received volume request: Current volume: {self.current_volume} ul")
         return self.current_volume

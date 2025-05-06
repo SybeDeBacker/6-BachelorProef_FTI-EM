@@ -25,6 +25,7 @@ class RobotServer:
         self.app.add_url_rule('/aspirate', 'aspirate', self.handle_aspirate_command, methods=['POST'])
         self.app.add_url_rule('/dispense', 'dispense', self.handle_dispense_command, methods=['POST'])
         self.app.add_url_rule('/set_parameters', 'set_parameters', self.handle_set_parameters, methods=['POST'])
+        self.app.add_url_rule('/set_calibration_offset', 'set_calibration_offset', self.handle_set_calibration_offset, methods=['POST'])
         self.app.add_url_rule('/set_safe_bounds', 'set_safe_bounds', self.handle_set_safe_bounds, methods=['POST'])
         self.app.add_url_rule('/ping', 'ping', self.handle_ping, methods=['GET'])
         self.app.add_url_rule('/request', 'request', self.handle_request, methods=['GET'])
@@ -121,6 +122,17 @@ class RobotServer:
         
         except Exception as e:
             return self.exception_handler(str(e), "Error handling set parameter command")
+
+    def handle_set_calibration_offset(self)->tuple[dict[str,str],int]:
+        try:
+            command = request.get_json()
+            offset:float = float(command.get("offset"))
+            self.logger_server.info(f"Received calibration command: offset={offset}")
+            response = self.robot.set_calibration_offset(offset=offset)
+            self.logger_server.info(f"{response["message"]}")
+            return {"status": "Success", "message": response["message"]},200
+        except Exception as e:
+            return self.exception_handler(str(e),"Error setting calibration")
 
     def handle_set_safe_bounds(self)->tuple[dict[str,str],int]:
         try:

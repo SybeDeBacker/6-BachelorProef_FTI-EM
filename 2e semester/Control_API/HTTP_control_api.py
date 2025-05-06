@@ -199,6 +199,20 @@ class RobotControlAPI:
         
         return {"status": "success", "message": f"Ratio set to {ratio_in_ul_per_mm} ul/mm"}
 
+    def set_calibration_offset(self, offset: float):
+        if not self.connected:
+            self.logger_http_client.error("Request failed: Not connected to server")
+            return {"status": "error", "message": "Not connected to server"}
+        
+        self.logger_http_client.info(f"Changing calibration offset to {offset}ul")
+
+        self.send_message(json.dumps({
+            "offset": offset
+            }),"set_calibration_offset")
+        
+        return {"status": "success", "message": f"Offset set to {offset} ul"}
+
+
     def get_status(self):
         """Checks and returns the current connection status."""
         self.logger_http_client.info("Sending status request")
@@ -241,7 +255,7 @@ class RobotControlAPI:
                 self.logger_http_client.info(f"Sending message: {message}")
                 # Send the HTTP POST request to the server with the message
                 # Change this line in your Python client:
-                post_endpoints = ["aspirate","dispense","set_parameters","set_safe_bounds"]
+                post_endpoints = ["aspirate","dispense","set_parameters","set_safe_bounds","set_calibration_offset"]
                 if endpoint in post_endpoints:
                     response = requests.post(f"{self.server_url}/{endpoint}", json=json.loads(message))
                 else:

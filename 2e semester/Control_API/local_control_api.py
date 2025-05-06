@@ -121,6 +121,15 @@ class RobotControlAPI:
         except Exception as e:
             return self.exception_handler(str(e),"Error setting Lead")
 
+    def set_calibration_offset(self, offset: float):
+        self.logger_local.info(f"Setting calibration offset to {offset}")
+        try:
+            response = self.robot.set_calibration_offset(offset=offset)
+            self.logger_local.info(response["message"])
+            return{"status": "success", "message": response["message"]}
+        except Exception as e:
+            return self.exception_handler(str(e),"Error setting calibration offset")
+
     def set_safe_bounds(self,bounds: list[int]):
         self.logger_local.info(f"Setting safe bounds to {bounds}")
         try:
