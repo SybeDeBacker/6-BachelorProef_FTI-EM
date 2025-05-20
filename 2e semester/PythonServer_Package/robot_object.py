@@ -7,7 +7,7 @@ from time import time
 import os
 
 class RobotObject:
-    def __init__(self, serial_port: str = 'COM3', baud_rate: int = 9600, timeout: int = 10) -> None:        
+    def __init__(self, serial_port: str = 'COM3', baud_rate: int = 9600, timeout: int = 60) -> None:        
         self.serial_port = serial_port
         self.baud_rate = baud_rate
 
@@ -82,7 +82,7 @@ class RobotObject:
 {str(e): ^{width}}
 {"-"*width}\033[0m""")
             raise Exception("Error opening serial port")
-
+        dump = self.ser.read_all()
         self.ser.flush()  
         if False:
             if self.ser.in_waiting:    

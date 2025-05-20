@@ -24,7 +24,6 @@ void setup() {
   Serial.begin(115200);
   while (!Serial);
 
-  Serial.println("Initializing UART with TMC2209...");
   stepper.connectToPins(stepPin, dirPin);
   stepper.setStepsPerRevolution(200 * STEPPER_PIPET_MICROSTEPS);
   stepper.setSpeedInStepsPerSecond(200 * STEPPER_PIPET_MICROSTEPS);
@@ -48,7 +47,6 @@ void setup() {
   driver.sedn(0b01);
   */
 
-  Serial.println("TMC2209 and StallGuard initialized.");
   pinMode(LimitSwitch, INPUT_PULLUP);
 }
 
@@ -148,7 +146,6 @@ bool moveStepper(int steps, float rps) {
     // Limit switch check
     if ((!digitalRead(LimitSwitch) == 1) && (steps > 0)) {
       stepper.emergencyStop();
-      Serial.println("Limit switch triggered!");
       return false;
     }
 

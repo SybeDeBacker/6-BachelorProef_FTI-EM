@@ -154,5 +154,5 @@ class RobotControlAPI:
         if error_msg == "Error opening serial port":
             self.logger_local.critical(f"{error_template}: {error_msg}")
         else:
-            self.logger_local.error(f"Error setting Volume to travel ratio: {error_msg}")
-        return {"status":"error","message":f"Error setting Volume to travel ratio: {error_msg}"}
+            self.logger_local.error(f"{error_template}: {error_msg}")
+        return {"status":"error","message":f"{error_msg}"}
